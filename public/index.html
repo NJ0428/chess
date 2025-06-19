@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>소켓 체스 게임</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>소켓 체스 게임</h1>
+    
+    <!-- 로비 화면 -->
+    <div id="lobby" class="game-section">
+      <h2>대기실</h2>
+      
+      <div class="user-form">
+        <div class="form-group">
+          <label for="playerNameInput">플레이어 이름</label>
+          <input type="text" id="playerNameInput" placeholder="이름을 입력하세요">
+        </div>
+      </div>
+      
+      <div class="room-section">
+        <h3>방 만들기</h3>
+        <div class="form-group">
+          <input type="text" id="roomIdInput" placeholder="방 아이디를 입력하세요">
+          <button id="createRoomBtn">방 만들기</button>
+        </div>
+      </div>
+      
+      <div class="room-list-section">
+        <h3>참가 가능한 방</h3>
+        <button id="refreshRoomListBtn">새로고침</button>
+        
+        <div id="roomList" class="room-list">
+          <!-- 방 목록이 여기에 동적으로 추가됩니다 -->
+          <div class="no-rooms-message">현재 참가할 수 있는 방이 없습니다.</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 대기 화면 -->
+    <div id="gameSetup" class="game-section" style="display: none;">
+      <h2>게임 대기</h2>
+      <p id="roomInfo"></p>
+      <p id="waitingMsg">상대방을 기다리는 중입니다...</p>
+      <button id="backToLobbyBtn" class="secondary-btn">대기실로 돌아가기</button>
+    </div>
+    
+    <!-- 게임 화면 -->
+    <div id="gameBoard" class="game-section" style="display: none;">
+      <div class="game-info">
+        <div id="playerColor"></div>
+        <div id="currentTurn"></div>
+        <div id="gameStatus"></div>
+      </div>
+      
+      <div class="players-info">
+        <div id="whitePlayerInfo" class="player-info">백: </div>
+        <div id="blackPlayerInfo" class="player-info">흑: </div>
+      </div>
+      
+      <div class="board-container">
+        <div id="board" class="chess-board"></div>
+      </div>
+      
+      <!-- 체스 이동 범례 -->
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-color legend-valid-move"></div>
+          <span>이동 가능</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color legend-valid-capture"></div>
+          <span>공격 가능</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color legend-castling"></div>
+          <span>캐슬링</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color legend-en-passant"></div>
+          <span>앙파상</span>
+        </div>
+      </div>
+      
+      <div class="game-controls">
+        <button id="restartBtn" style="display: none;">게임 재시작</button>
+        <button id="leaveGameBtn" class="secondary-btn">게임 나가기</button>
+        <button id="showRulesBtn" class="show-rules-btn">체스 규칙</button>
+      </div>
+    </div>
+    
+    <div id="notification" class="notification"></div>
+    
+    <!-- 체스 규칙 설명 패널 -->
+    <div id="chessRulesPanel" class="chess-rules-panel">
+      <button class="close-btn" id="closeRulesBtn">&times;</button>
+      <h4>체스 특수 규칙</h4>
+      <p><strong>캐슬링:</strong> 킹과 룩이 아직 움직이지 않았고, 경로에 말이 없으며, 킹이 체크 상태가 아닐 때 가능합니다. 킹이 룩 방향으로 두 칸 이동하고, 룩은 킹을 뛰어넘어 반대편에 위치합니다.</p>
+      <p><strong>앙파상:</strong> 상대 폰이 두 칸 전진했을 때, 바로 다음 턴에 내 폰이 그 폰 옆에서 대각선으로 이동하면 상대 폰을 잡을 수 있습니다.</p>
+      <p><strong>체크:</strong> 킹이 공격받는 상태로, 킹을 보호하거나 이동시켜야 합니다.</p>
+      <p><strong>체크메이트:</strong> 킹이 체크 상태이며 이를 피할 방법이 없을 때 게임이 종료됩니다.</p>
+    </div>
+    
+    <!-- TTS를 위한 오디오 요소 (숨김) -->
+    <div id="tts-container" style="display: none;">
+      <audio id="check-audio" src="sounds/check.mp3" preload="auto" volume="0.5"></audio>
+      <audio id="checkmate-audio" src="sounds/checkmate.mp3" preload="auto" volume="0.5"></audio>
+      <audio id="move-audio" src="sounds/move.mp3" preload="auto" volume="0.5"></audio>
+      <audio id="capture-audio" src="sounds/capture.mp3" preload="auto" volume="0.5"></audio>
+    </div>
+  </div>
+
+  <!-- 방 목록 아이템 템플릿 -->
+  <template id="roomItemTemplate">
+    <div class="room-item">
+      <div class="room-info">
+        <h4 class="room-id"></h4>
+      </div>
+      <button class="join-btn">참가</button>
+    </div>
+  </template>
+
+  <!-- Socket.IO 클라이언트 라이브러리 -->
+  <script src="/socket.io/socket.io.js"></script>
+  
+  <!-- 음성 합성 초기화 -->
+  <script>
+    // 브라우저의 음성 합성 기능 초기화
+    if ('speechSynthesis' in window) {
+      // 음성 합성 초기화
+      speechSynthesis.onvoiceschanged = () => {
+        console.log('음성 합성 준비 완료');
+      };
+    }
+  </script>
+  
+  <!-- 체스 게임 클라이언트 스크립트 -->
+  <script src="js/app.js"></script>
+</body>
+</html> 
