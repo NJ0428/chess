@@ -1,7 +1,7 @@
 # 소켓 기반 체스 게임
 
 이 프로젝트는 소켓을 이용한 실시간 멀티플레이어 체스 게임입니다.
-
+<img alt="img.png" src="https://github.com/NJ0428/chess/blob/main/public/img.png?raw=true" data-hpc="true" class="Box-sc-g0xbh4-0 fzFXnm">
 ## 기능 소개
 
 - Socket.IO를 이용한 실시간 게임 통신
