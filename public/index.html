@@ -34,7 +34,6 @@
         <button id="refreshRoomListBtn">새로고침</button>
         
         <div id="roomList" class="room-list">
-          <!-- 방 목록이 여기에 동적으로 추가됩니다 -->
           <div class="no-rooms-message">현재 참가할 수 있는 방이 없습니다.</div>
         </div>
       </div>
@@ -104,12 +103,14 @@
       <p><strong>체크메이트:</strong> 킹이 체크 상태이며 이를 피할 방법이 없을 때 게임이 종료됩니다.</p>
     </div>
     
-    <!-- TTS를 위한 오디오 요소 (숨김) -->
-    <div id="tts-container" style="display: none;">
-      <audio id="check-audio" src="sounds/check.mp3" preload="auto" volume="0.5"></audio>
+    <!-- 오디오 요소 -->
+    <div style="display: none;">
+      <audio id="check-audio" src="sounds/Check.mp3" preload="auto" volume="0.5"></audio>
       <audio id="checkmate-audio" src="sounds/checkmate.mp3" preload="auto" volume="0.5"></audio>
       <audio id="move-audio" src="sounds/move.mp3" preload="auto" volume="0.5"></audio>
-      <audio id="capture-audio" src="sounds/capture.mp3" preload="auto" volume="0.5"></audio>
+      <audio id="capture-audio" src="sounds/move.mp3" preload="auto" volume="0.5"></audio>
+      <audio id="king-castling-audio" src="sounds/KingCastling.mp3" preload="auto" volume="0.5"></audio>
+      <audio id="queen-castling-audio" src="sounds/QueenCastling.mp3" preload="auto" volume="0.5"></audio>
     </div>
   </div>
 
@@ -125,17 +126,6 @@
 
   <!-- Socket.IO 클라이언트 라이브러리 -->
   <script src="/socket.io/socket.io.js"></script>
-  
-  <!-- 음성 합성 초기화 -->
-  <script>
-    // 브라우저의 음성 합성 기능 초기화
-    if ('speechSynthesis' in window) {
-      // 음성 합성 초기화
-      speechSynthesis.onvoiceschanged = () => {
-        console.log('음성 합성 준비 완료');
-      };
-    }
-  </script>
   
   <!-- 체스 게임 클라이언트 스크립트 -->
   <script src="js/app.js"></script>

@@ -1,996 +1,797 @@
 // Socket.IO 연결 설정
 const socket = io();
 
-// 전역 변수
-let playerColor = null;
-let currentRoom = null;
-let gameBoard = null;
-let selectedSquare = null;
-let myTurn = false;
-let currentTurn = 'white'; // 현재 턴 추적
-let playerName = ''; // 플레이어 이름
-
-// DOM 요소 - 로비
-const lobby = document.getElementById('lobby');
-const playerNameInput = document.getElementById('playerNameInput');
-const roomIdInput = document.getElementById('roomIdInput');
-const createRoomBtn = document.getElementById('createRoomBtn');
-const refreshRoomListBtn = document.getElementById('refreshRoomListBtn');
-const roomList = document.getElementById('roomList');
-const roomItemTemplate = document.getElementById('roomItemTemplate');
-
-// DOM 요소 - 대기실
-const gameSetup = document.getElementById('gameSetup');
-const waitingMsg = document.getElementById('waitingMsg');
-const roomInfo = document.getElementById('roomInfo');
-const backToLobbyBtn = document.getElementById('backToLobbyBtn');
-
-// DOM 요소 - 게임판
-const gameBoard_el = document.getElementById('gameBoard');
-const board = document.getElementById('board');
-const playerColorEl = document.getElementById('playerColor');
-const currentTurnEl = document.getElementById('currentTurn');
-const gameStatusEl = document.getElementById('gameStatus');
-const whitePlayerInfo = document.getElementById('whitePlayerInfo');
-const blackPlayerInfo = document.getElementById('blackPlayerInfo');
-const restartBtn = document.getElementById('restartBtn');
-const leaveGameBtn = document.getElementById('leaveGameBtn');
-const notificationEl = document.getElementById('notification');
-
-// DOM 요소 - 체스 규칙
-const showRulesBtn = document.getElementById('showRulesBtn');
-const chessRulesPanel = document.getElementById('chessRulesPanel');
-const closeRulesBtn = document.getElementById('closeRulesBtn');
-
-// TTS를 위한 요소
-const checkAudio = document.getElementById('check-audio');
-const checkmateAudio = document.getElementById('checkmate-audio');
-const moveAudio = document.getElementById('move-audio');
-const captureAudio = document.getElementById('capture-audio');
-
-// 오디오 로드 상태 확인
-let audioLoaded = {
-  check: false,
-  checkmate: false,
-  move: false,
-  capture: false
-};
-
-// 오디오 로드 이벤트 리스너 추가
-if (checkAudio) {
-  checkAudio.addEventListener('canplaythrough', () => { audioLoaded.check = true; });
-  checkAudio.addEventListener('error', () => { console.log('체크 오디오 로드 실패'); });
-}
-if (checkmateAudio) {
-  checkmateAudio.addEventListener('canplaythrough', () => { audioLoaded.checkmate = true; });
-  checkmateAudio.addEventListener('error', () => { console.log('체크메이트 오디오 로드 실패'); });
-}
-if (moveAudio) {
-  moveAudio.addEventListener('canplaythrough', () => { audioLoaded.move = true; });
-  moveAudio.addEventListener('error', () => { console.log('이동 오디오 로드 실패'); });
-}
-if (captureAudio) {
-  captureAudio.addEventListener('canplaythrough', () => { audioLoaded.capture = true; });
-  captureAudio.addEventListener('error', () => { console.log('캡처 오디오 로드 실패'); });
-}
-
-// 체스말 이미지 URL (공개 체스말 이미지로 대체)
-const pieceImages = {
-  'white': {
-    'pawn': 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg',
-    'rook': 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg',
-    'knight': 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg',
-    'bishop': 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg',
-    'queen': 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg',
-    'king': 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg'
+// 상수 및 설정
+const CONSTANTS = {
+  AUDIO: {
+    CHECK: 'sounds/check.mp3',
+    CHECKMATE: 'sounds/checkmate.mp3',
+    MOVE: 'sounds/move.mp3',
+    CAPTURE: 'sounds/capture.mp3',
+    KING_CASTLING: 'sounds/KingCastling.mp3',
+    QUEEN_CASTLING: 'sounds/QueenCastling.mp3'
   },
-  'black': {
-    'pawn': 'https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg',
-    'rook': 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg',
-    'knight': 'https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg',
-    'bishop': 'https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg',
-    'queen': 'https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg',
-    'king': 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg'
+  PIECE_IMAGES: {
+    'white': {
+      'pawn': 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg',
+      'rook': 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg',
+      'knight': 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg',
+      'bishop': 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg',
+      'queen': 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg',
+      'king': 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg'
+    },
+    'black': {
+      'pawn': 'https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg',
+      'rook': 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg',
+      'knight': 'https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg',
+      'bishop': 'https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg',
+      'queen': 'https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg',
+      'king': 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg'
+    }
+  },
+  MOVE_TYPES: {
+    VALID_MOVE: 'valid-move',
+    VALID_CAPTURE: 'valid-capture',
+    VALID_CASTLING: 'valid-castling',
+    VALID_EN_PASSANT: 'valid-en-passant'
   }
 };
 
-// 이벤트 리스너 초기화
-function initEventListeners() {
-  createRoomBtn.addEventListener('click', createRoom);
-  refreshRoomListBtn.addEventListener('click', getRoomList);
-  backToLobbyBtn.addEventListener('click', backToLobby);
-  restartBtn.addEventListener('click', restartGame);
-  leaveGameBtn.addEventListener('click', leaveGame);
-  
-  // 체스 규칙 패널
-  if (showRulesBtn) {
-    showRulesBtn.addEventListener('click', toggleRulesPanel);
+// 게임 상태 관리
+const gameState = {
+  playerColor: null,
+  currentRoom: null,
+  gameBoard: null,
+  selectedSquare: null,
+  myTurn: false,
+  currentTurn: 'white',
+  playerName: '',
+  audioLoaded: {
+    check: false,
+    checkmate: false,
+    move: false,
+    capture: false,
+    'king-castling': false,
+    'queen-castling': false
   }
-  
-  if (closeRulesBtn) {
-    closeRulesBtn.addEventListener('click', closeRulesPanel);
+};
+
+// DOM 요소 캐시
+const elements = {
+  // 로비
+  lobby: document.getElementById('lobby'),
+  playerNameInput: document.getElementById('playerNameInput'),
+  roomIdInput: document.getElementById('roomIdInput'),
+  createRoomBtn: document.getElementById('createRoomBtn'),
+  refreshRoomListBtn: document.getElementById('refreshRoomListBtn'),
+  roomList: document.getElementById('roomList'),
+  roomItemTemplate: document.getElementById('roomItemTemplate'),
+
+  // 대기실
+  gameSetup: document.getElementById('gameSetup'),
+  waitingMsg: document.getElementById('waitingMsg'),
+  roomInfo: document.getElementById('roomInfo'),
+  backToLobbyBtn: document.getElementById('backToLobbyBtn'),
+
+  // 게임판
+  gameBoard: document.getElementById('gameBoard'),
+  board: document.getElementById('board'),
+  playerColorEl: document.getElementById('playerColor'),
+  currentTurnEl: document.getElementById('currentTurn'),
+  gameStatusEl: document.getElementById('gameStatus'),
+  whitePlayerInfo: document.getElementById('whitePlayerInfo'),
+  blackPlayerInfo: document.getElementById('blackPlayerInfo'),
+  restartBtn: document.getElementById('restartBtn'),
+  leaveGameBtn: document.getElementById('leaveGameBtn'),
+  notificationEl: document.getElementById('notification'),
+
+  // 체스 규칙
+  showRulesBtn: document.getElementById('showRulesBtn'),
+  chessRulesPanel: document.getElementById('chessRulesPanel'),
+  closeRulesBtn: document.getElementById('closeRulesBtn'),
+
+  // 오디오
+  audio: {
+    check: document.getElementById('check-audio'),
+    checkmate: document.getElementById('checkmate-audio'),
+    move: document.getElementById('move-audio'),
+    capture: document.getElementById('capture-audio'),
+    'king-castling': document.getElementById('king-castling-audio'),
+    'queen-castling': document.getElementById('queen-castling-audio')
   }
-}
+};
 
-// 초기화 함수
-function init() {
-  initEventListeners();
-  // 페이지 로드 시 방 목록 가져오기
-  getRoomList();
-}
-
-// 방 생성
-function createRoom() {
-  playerName = playerNameInput.value.trim() || '익명';
-  const roomId = roomIdInput.value.trim();
-  
-  if (!roomId) {
-    showNotification('방 아이디를 입력해주세요.');
-    return;
+// 오디오 관리 클래스
+class AudioManager {
+  constructor() {
+    this.setupAudioElements();
   }
-  
-  socket.emit('createRoom', { roomId, playerName });
-}
 
-// 방 참가
-function joinRoom(roomId) {
-  playerName = playerNameInput.value.trim() || '익명';
-  
-  if (!roomId) {
-    showNotification('방 아이디가 없습니다.');
-    return;
-  }
-  
-  socket.emit('joinRoom', { roomId, playerName });
-}
-
-// 방 나가기
-function leaveGame() {
-  if (currentRoom) {
-    socket.emit('leaveRoom', currentRoom);
-    backToLobby();
-  }
-}
-
-// 로비로 돌아가기
-function backToLobby() {
-  currentRoom = null;
-  playerColor = null;
-  gameBoard = null;
-  selectedSquare = null;
-  myTurn = false;
-  
-  gameBoard_el.style.display = 'none';
-  gameSetup.style.display = 'none';
-  lobby.style.display = 'block';
-  
-  // 방 목록 새로고침
-  getRoomList();
-}
-
-// 방 목록 가져오기
-function getRoomList() {
-  socket.emit('getRoomList');
-}
-
-// 방 목록 표시
-function displayRoomList(rooms) {
-  // 기존 목록 초기화
-  roomList.innerHTML = '';
-  
-  if (rooms.length === 0) {
-    const noRoomsMsg = document.createElement('div');
-    noRoomsMsg.className = 'no-rooms-message';
-    noRoomsMsg.textContent = '현재 참가할 수 있는 방이 없습니다.';
-    roomList.appendChild(noRoomsMsg);
-    return;
-  }
-  
-  // 방 목록 표시
-  rooms.forEach(room => {
-    const roomItem = roomItemTemplate.content.cloneNode(true);
-    roomItem.querySelector('.room-id').textContent = room.id;
-    
-    const joinBtn = roomItem.querySelector('.join-btn');
-    joinBtn.addEventListener('click', () => joinRoom(room.id));
-    
-    roomList.appendChild(roomItem);
-  });
-}
-
-// 게임 재시작
-function restartGame() {
-  if (currentRoom) {
-    socket.emit('restartGame', currentRoom);
-  }
-}
-
-// 체스판 렌더링
-function renderBoard(boardData) {
-  // 기존 체스판 클리어
-  board.innerHTML = '';
-  
-  // 플레이어 색상에 따라 다르게 렌더링 (각 플레이어의 말이 아래쪽에 오도록)
-  const isBlack = playerColor === 'black';
-  
-  // 8x8 체스판 생성
-  for (let row = 0; row < 8; row++) {
-    for (let col = 0; col < 8; col++) {
-      // 실제 체스판의 위치 계산 (색상에 따라 역순으로)
-      // 수정: 자신의 색상이 항상 아래에 오도록 변경
-      const actualRow = isBlack ? 7 - row : row;
-      const actualCol = isBlack ? col : 7 - col;
-      
-      // 체스판 칸 생성
-      const square = document.createElement('div');
-      square.className = `square ${(actualRow + actualCol) % 2 === 0 ? 'white' : 'black'}`;
-      // 저장은 항상 원래 좌표계로
-      square.dataset.row = actualRow;
-      square.dataset.col = actualCol;
-      square.addEventListener('click', handleSquareClick);
-      
-      // 체스말이 있으면 표시
-      const piece = boardData[actualRow][actualCol];
-      if (piece) {
-        const pieceEl = document.createElement('div');
-        pieceEl.className = `chess-piece ${piece.color} ${piece.type}`;
+  setupAudioElements() {
+    Object.keys(elements.audio).forEach(key => {
+      const audio = elements.audio[key];
+      if (audio) {
+        audio.addEventListener('canplaythrough', () => {
+          gameState.audioLoaded[key] = true;
+          console.log(`${key} 오디오 로드 완료`);
+        });
+        audio.addEventListener('error', () => {
+          console.log(`${key} 오디오 로드 실패`);
+          gameState.audioLoaded[key] = false;
+        });
         
-        // 체스말 이미지 설정
-        pieceEl.style.backgroundImage = `url(${pieceImages[piece.color][piece.type]})`;
-        
-        square.appendChild(pieceEl);
-      }
-      
-      // 디버그용 좌표 표시 (선택 사항)
-      if (false) { // 좌표 표시 끄기, 필요하면 true로 변경
-        const coordLabel = document.createElement('div');
-        coordLabel.className = 'coord-label';
-        coordLabel.textContent = `${actualRow},${actualCol}`;
-        square.appendChild(coordLabel);
-      }
-      
-      board.appendChild(square);
-    }
-  }
-  
-  // 게임 정보 업데이트
-  updateGameInfo();
-}
-
-// 게임 정보 업데이트
-function updateGameInfo() {
-  playerColorEl.textContent = `당신의 색상: ${playerColor === 'white' ? '백' : '흑'}`;
-  currentTurnEl.textContent = `현재 턴: ${myTurn ? '당신의 턴' : '상대방 턴'}`;
-  
-  // 현재 턴에 따라 배경색 변경
-  updateBackgroundColor();
-}
-
-// 배경색 업데이트
-function updateBackgroundColor() {
-  if (currentTurn === 'white') {
-    document.body.classList.add('white-turn');
-    document.body.classList.remove('black-turn');
-  } else {
-    document.body.classList.add('black-turn');
-    document.body.classList.remove('white-turn');
-  }
-}
-
-// 알림 표시
-function showNotification(message) {
-  notificationEl.textContent = message;
-  notificationEl.style.display = 'block';
-  
-  setTimeout(() => {
-    notificationEl.style.display = 'none';
-  }, 3000);
-}
-
-// TTS 재생
-function playTTS(text) {
-  // Web Speech API 사용
-  if ('speechSynthesis' in window) {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'ko-KR'; // 한국어 설정
-    utterance.volume = 1.0;   // 볼륨 최대
-    utterance.rate = 1.0;     // 평균 속도
-    utterance.pitch = 1.0;    // 평균 피치
-    
-    // 음성 선택 (한국어 음성이 있으면 선택)
-    const voices = window.speechSynthesis.getVoices();
-    const koreanVoice = voices.find(voice => voice.lang === 'ko-KR');
-    if (koreanVoice) {
-      utterance.voice = koreanVoice;
-    }
-    
-    // 이전 음성이 있다면 중지
-    window.speechSynthesis.cancel();
-    
-    // 음성 재생
-    window.speechSynthesis.speak(utterance);
-    console.log(`TTS 재생: ${text}`);
-  } else {
-    console.log('이 브라우저는 음성 합성을 지원하지 않습니다.');
-  }
-}
-
-// 체스판 칸 클릭 처리
-function handleSquareClick(event) {
-  // 내 턴이 아니면 무시
-  if (!myTurn) {
-    console.log('현재 턴:', currentTurn, '내 색상:', playerColor);
-    showNotification('당신의 턴이 아닙니다.');
-    return;
-  }
-  
-  const square = event.currentTarget;
-  const row = parseInt(square.dataset.row);
-  const col = parseInt(square.dataset.col);
-  
-  // 첫 번째 클릭 (말 선택)
-  if (selectedSquare === null) {
-    const piece = gameBoard[row][col];
-    
-    // 내 말이 아니거나 말이 없는 경우
-    if (!piece || piece.color !== playerColor) {
-      showNotification('자신의 말만 선택할 수 있습니다.');
-      return;
-    }
-    
-    // 말 선택
-    selectedSquare = { row, col };
-    square.classList.add('selected');
-    
-    // 이동 가능한 위치 표시
-    showPossibleMoves(row, col, piece);
-  }
-  // 두 번째 클릭 (목적지 선택)
-  else {
-    const fromRow = selectedSquare.row;
-    const fromCol = selectedSquare.col;
-    
-    // 선택한 말의 위치와 같은 위치면 선택 취소
-    if (fromRow === row && fromCol === col) {
-      clearSelection();
-      return;
-    }
-    
-    // 서버에 이동 요청
-    socket.emit('movePiece', {
-      roomId: currentRoom,
-      from: [fromRow, fromCol],
-      to: [row, col],
-      color: playerColor
-    });
-    
-    // 선택 상태 초기화
-    clearSelection();
-  }
-}
-
-// 말 선택 취소
-function clearSelection() {
-  if (selectedSquare !== null) {
-    // 선택된 칸 초기화
-    const selected = document.querySelector('.square.selected');
-    if (selected) {
-      selected.classList.remove('selected');
-    }
-    
-    // 이동 가능 표시 초기화
-    const validMoves = document.querySelectorAll('.valid-move, .valid-capture, .valid-castling, .valid-en-passant');
-    validMoves.forEach(square => {
-      square.classList.remove('valid-move');
-      square.classList.remove('valid-capture');
-      square.classList.remove('valid-castling');
-      square.classList.remove('valid-en-passant');
-    });
-    
-    selectedSquare = null;
-  }
-}
-
-// 이동 가능한 위치 표시 함수
-function showPossibleMoves(row, col, piece) {
-  // 말의 종류에 따라 다른 이동 가능 위치 계산
-  const possibleMoves = [];
-  
-  const isBlack = piece.color === 'black';
-  
-  switch(piece.type) {
-    case 'pawn':
-      // 폰 이동 패턴 (앞으로 한 칸 또는 두 칸, 대각선 공격)
-      const direction = isBlack ? 1 : -1;
-      const startRow = isBlack ? 1 : 6;
-      
-      // 앞으로 한 칸 이동
-      if (isValidPosition(row + direction, col) && !getPieceAt(row + direction, col)) {
-        possibleMoves.push({ row: row + direction, col: col, capture: false });
-      }
-      
-      // 첫 이동시 두 칸 이동 가능
-      if (row === startRow && !getPieceAt(row + direction, col) && !getPieceAt(row + 2 * direction, col)) {
-        possibleMoves.push({ row: row + 2 * direction, col: col, capture: false });
-      }
-      
-      // 대각선 공격 (왼쪽)
-      if (isValidPosition(row + direction, col - 1)) {
-        const targetPiece = getPieceAt(row + direction, col - 1);
-        if (targetPiece && targetPiece.color !== piece.color) {
-          possibleMoves.push({ row: row + direction, col: col - 1, capture: true });
+        // 로드 상태 초기화
+        if (audio.readyState >= 4) {
+          gameState.audioLoaded[key] = true;
+          console.log(`${key} 오디오 이미 로드됨`);
         }
-      }
-      
-      // 대각선 공격 (오른쪽)
-      if (isValidPosition(row + direction, col + 1)) {
-        const targetPiece = getPieceAt(row + direction, col + 1);
-        if (targetPiece && targetPiece.color !== piece.color) {
-          possibleMoves.push({ row: row + direction, col: col + 1, capture: true });
-        }
-      }
-      
-      // 앙파상
-      if (row === (isBlack ? 4 : 3)) { // 앙파상 가능한 행 위치
-        // 왼쪽 앙파상
-        if (isValidPosition(row, col - 1)) {
-          const leftPiece = getPieceAt(row, col - 1);
-          if (leftPiece && leftPiece.type === 'pawn' && leftPiece.color !== piece.color) {
-            // lastMoveWasDouble 속성 확인
-            if (leftPiece.lastMoveWasDouble) {
-              console.log('왼쪽 앙파상 가능:', row, col - 1);
-              possibleMoves.push({ 
-                row: row + direction, 
-                col: col - 1, 
-                capture: true,
-                special: 'en_passant'
-              });
-            }
-          }
-        }
-        
-        // 오른쪽 앙파상
-        if (isValidPosition(row, col + 1)) {
-          const rightPiece = getPieceAt(row, col + 1);
-          if (rightPiece && rightPiece.type === 'pawn' && rightPiece.color !== piece.color) {
-            // lastMoveWasDouble 속성 확인
-            if (rightPiece.lastMoveWasDouble) {
-              console.log('오른쪽 앙파상 가능:', row, col + 1);
-              possibleMoves.push({ 
-                row: row + direction, 
-                col: col + 1, 
-                capture: true,
-                special: 'en_passant'
-              });
-            }
-          }
-        }
-      }
-      break;
-      
-    case 'rook':
-      // 룩 이동 패턴 (수직, 수평)
-      // 위쪽 방향
-      checkStraightLine(row, col, -1, 0, possibleMoves);
-      // 오른쪽 방향
-      checkStraightLine(row, col, 0, 1, possibleMoves);
-      // 아래쪽 방향
-      checkStraightLine(row, col, 1, 0, possibleMoves);
-      // 왼쪽 방향
-      checkStraightLine(row, col, 0, -1, possibleMoves);
-      break;
-      
-    case 'knight':
-      // 나이트 이동 패턴 (L자 이동)
-      const knightMoves = [
-        { r: -2, c: -1 }, { r: -2, c: 1 },
-        { r: -1, c: -2 }, { r: -1, c: 2 },
-        { r: 1, c: -2 }, { r: 1, c: 2 },
-        { r: 2, c: -1 }, { r: 2, c: 1 }
-      ];
-      
-      knightMoves.forEach(move => {
-        const newRow = row + move.r;
-        const newCol = col + move.c;
-        
-        if (isValidPosition(newRow, newCol)) {
-          const targetPiece = getPieceAt(newRow, newCol);
-          if (!targetPiece) {
-            possibleMoves.push({ row: newRow, col: newCol, capture: false });
-          } else if (targetPiece.color !== piece.color) {
-            possibleMoves.push({ row: newRow, col: newCol, capture: true });
-          }
-        }
-      });
-      break;
-      
-    case 'bishop':
-      // 비숍 이동 패턴 (대각선)
-      // 왼쪽 위 대각선
-      checkStraightLine(row, col, -1, -1, possibleMoves);
-      // 오른쪽 위 대각선
-      checkStraightLine(row, col, -1, 1, possibleMoves);
-      // 왼쪽 아래 대각선
-      checkStraightLine(row, col, 1, -1, possibleMoves);
-      // 오른쪽 아래 대각선
-      checkStraightLine(row, col, 1, 1, possibleMoves);
-      break;
-      
-    case 'queen':
-      // 퀸 이동 패턴 (수직, 수평, 대각선)
-      // 수직, 수평 (룩과 동일)
-      checkStraightLine(row, col, -1, 0, possibleMoves);
-      checkStraightLine(row, col, 0, 1, possibleMoves);
-      checkStraightLine(row, col, 1, 0, possibleMoves);
-      checkStraightLine(row, col, 0, -1, possibleMoves);
-      // 대각선 (비숍과 동일)
-      checkStraightLine(row, col, -1, -1, possibleMoves);
-      checkStraightLine(row, col, -1, 1, possibleMoves);
-      checkStraightLine(row, col, 1, -1, possibleMoves);
-      checkStraightLine(row, col, 1, 1, possibleMoves);
-      break;
-      
-    case 'king':
-      // 킹 이동 패턴 (주변 한 칸)
-      for (let r = -1; r <= 1; r++) {
-        for (let c = -1; c <= 1; c++) {
-          // 현재 위치 제외
-          if (r === 0 && c === 0) continue;
-          
-          const newRow = row + r;
-          const newCol = col + c;
-          
-          if (isValidPosition(newRow, newCol)) {
-            const targetPiece = getPieceAt(newRow, newCol);
-            if (!targetPiece) {
-              possibleMoves.push({ row: newRow, col: newCol, capture: false });
-            } else if (targetPiece.color !== piece.color) {
-              possibleMoves.push({ row: newRow, col: newCol, capture: true });
-            }
-          }
-        }
-      }
-      
-      // 캐슬링 확인
-      if (piece.position === 'initial') {
-        // 킹사이드 캐슬링
-        let canCastleKingSide = true;
-        // 경로에 말이 없는지 확인
-        for (let c = col + 1; c < 7; c++) {
-          if (getPieceAt(row, c)) {
-            canCastleKingSide = false;
-            break;
-          }
-        }
-        
-        // 룩이 있고 초기 위치인지 확인
-        const kingSideRook = getPieceAt(row, 7);
-        if (canCastleKingSide && kingSideRook && kingSideRook.type === 'rook' && 
-            kingSideRook.color === piece.color && kingSideRook.position === 'initial') {
-          possibleMoves.push({ 
-            row: row, 
-            col: col + 2, 
-            capture: false,
-            special: 'castling',
-            rookFrom: [row, 7],
-            rookTo: [row, 5]
-          });
-        }
-        
-        // 퀸사이드 캐슬링
-        let canCastleQueenSide = true;
-        // 경로에 말이 없는지 확인
-        for (let c = col - 1; c > 0; c--) {
-          if (getPieceAt(row, c)) {
-            canCastleQueenSide = false;
-            break;
-          }
-        }
-        
-        // 룩이 있고 초기 위치인지 확인
-        const queenSideRook = getPieceAt(row, 0);
-        if (canCastleQueenSide && queenSideRook && queenSideRook.type === 'rook' && 
-            queenSideRook.color === piece.color && queenSideRook.position === 'initial') {
-          possibleMoves.push({ 
-            row: row, 
-            col: col - 2, 
-            capture: false,
-            special: 'castling',
-            rookFrom: [row, 0],
-            rookTo: [row, 3]
-          });
-        }
-      }
-      break;
-  }
-  
-  // 화면에 이동 가능 위치 표시
-  possibleMoves.forEach(move => {
-    const selector = `[data-row="${move.row}"][data-col="${move.col}"]`;
-    const squareEl = document.querySelector(selector);
-    
-    if (squareEl) {
-      if (move.special === 'castling') {
-        squareEl.classList.add('valid-castling');
-      } else if (move.special === 'en_passant') {
-        squareEl.classList.add('valid-en-passant');
-      } else if (move.capture) {
-        squareEl.classList.add('valid-capture');
       } else {
-        squareEl.classList.add('valid-move');
+        console.log(`${key} 오디오 요소를 찾을 수 없음`);
       }
-    }
-  });
-}
-
-// 직선 방향(수직/수평/대각선)으로 이동 가능한 위치 확인
-function checkStraightLine(row, col, rowStep, colStep, possibleMoves) {
-  let currentRow = row + rowStep;
-  let currentCol = col + colStep;
-  const myColor = gameBoard[row][col].color;
-  
-  while (isValidPosition(currentRow, currentCol)) {
-    const targetPiece = getPieceAt(currentRow, currentCol);
-    
-    if (!targetPiece) {
-      // 비어있는 칸으로 이동 가능
-      possibleMoves.push({ row: currentRow, col: currentCol, capture: false });
-      currentRow += rowStep;
-      currentCol += colStep;
-    } else {
-      // 말이 있는 경우
-      if (targetPiece.color !== myColor) {
-        // 상대 말은 잡을 수 있음
-        possibleMoves.push({ row: currentRow, col: currentCol, capture: true });
-      }
-      break; // 말이 있으면 더 이상 진행 불가
-    }
-  }
-}
-
-// 위치가 체스판 내에 있는지 확인
-function isValidPosition(row, col) {
-  return row >= 0 && row < 8 && col >= 0 && col < 8;
-}
-
-// 특정 위치의 말 가져오기
-function getPieceAt(row, col) {
-  return gameBoard[row][col];
-}
-
-// Socket.IO 이벤트 처리
-socket.on('roomList', (rooms) => {
-  displayRoomList(rooms);
-});
-
-socket.on('roomListUpdated', () => {
-  getRoomList(); // 방 목록 업데이트
-});
-
-socket.on('roomCreated', (data) => {
-  currentRoom = data.roomId;
-  playerColor = data.color;
-  
-  // UI 전환: 로비 -> 대기화면
-  lobby.style.display = 'none';
-  gameSetup.style.display = 'block';
-  roomInfo.textContent = `방 ID: ${currentRoom}`;
-});
-
-socket.on('roomJoined', (data) => {
-  currentRoom = data.roomId;
-  playerColor = data.color;
-  gameBoard = data.board;
-  
-  // 상대 정보 표시
-  const opponentName = data.opponentName || '익명';
-});
-
-socket.on('opponentJoined', (data) => {
-  // 상대방 정보 표시
-  const opponentName = data.opponentName;
-  showNotification(`${opponentName}님이 게임에 참가했습니다.`);
-});
-
-socket.on('gameStart', (data) => {
-  gameBoard = data.board;
-  currentTurn = data.turn; // 현재 턴 저장
-  myTurn = currentTurn === playerColor; // 내 색상이 현재 턴과 같으면 내 턴
-  
-  // 플레이어 정보 업데이트
-  whitePlayerInfo.textContent = `백: ${data.whitePlayer || '익명'}`;
-  blackPlayerInfo.textContent = `흑: ${data.blackPlayer || '익명'}`;
-  
-  // UI 전환: 대기화면 -> 게임판 화면
-  lobby.style.display = 'none';
-  gameSetup.style.display = 'none';
-  gameBoard_el.style.display = 'block';
-  
-  // 체스판 렌더링
-  renderBoard(gameBoard);
-  
-  // 초기 배경색 설정
-  updateBackgroundColor();
-  
-  // 턴 정보 표시
-  updateGameInfo();
-  
-  // 게임 시작 알림
-  if (myTurn) {
-    showNotification('게임이 시작되었습니다. 당신의 턴입니다.');
-  } else {
-    showNotification('게임이 시작되었습니다. 상대방의 턴을 기다리세요.');
-  }
-});
-
-socket.on('boardUpdate', (data) => {
-  gameBoard = data.board;
-  currentTurn = data.turn; // 현재 턴 업데이트
-  myTurn = currentTurn === playerColor; // 내 색상이 현재 턴과 같으면 내 턴
-  
-  // 말 이동 소리 재생
-  if (data.moveDetails && data.moveDetails.capture) {
-    playMoveSound(true); // 잡기 소리 재생
-  } else {
-    playMoveSound(false); // 일반 이동 소리 재생
-  }
-  
-  // 앙파상 움직임 디버그 로그
-  if (data.moveDetails && data.moveDetails.special === 'en_passant') {
-    console.log('앙파상 이동 감지:', data.moveDetails);
-  }
-  
-  // 체스판 갱신
-  renderBoard(gameBoard);
-  
-  // 배경색 업데이트
-  updateBackgroundColor();
-  
-  // 체크메이트인 경우
-  if (data.status === 'checkmate') {
-    gameStatusEl.textContent = '체크메이트!';
-    restartBtn.style.display = 'block';
-  } else {
-    // 턴 변경 알림
-    if (myTurn) {
-      showNotification('당신의 턴입니다.');
-    }
-  }
-});
-
-// 체크 이벤트 처리
-socket.on('check', (data) => {
-  // 체크 사운드 재생
-  playCheckSound();
-  
-  // 체크 표시 효과 추가
-  const kingColor = data.turn;
-  highlightKingInCheck(kingColor);
-  
-  // 상태 표시
-  gameStatusEl.textContent = '체크!';
-  gameStatusEl.className = 'check-status';
-  
-  // 알림 표시
-  showNotification('체크!');
-});
-
-// 체크 사운드 재생 함수
-function playCheckSound() {
-  if (checkAudio && audioLoaded.check) {
-    checkAudio.currentTime = 0;
-    checkAudio.play().catch(e => {
-      console.error('체크 오디오 재생 실패:', e);
-      playTTS('체크');
     });
-  } else {
-    // TTS 폴백
-    playTTS('체크');
   }
-}
 
-// 체크메이트 사운드 재생 함수
-function playCheckmateSound() {
-  if (checkmateAudio && audioLoaded.checkmate) {
-    checkmateAudio.currentTime = 0;
-    checkmateAudio.play().catch(e => {
-      console.error('체크메이트 오디오 재생 실패:', e);
-      playTTS('체크메이트');
+  play(type) {
+    console.log(`오디오 재생 시도: ${type}`);
+    const audio = elements.audio[type];
+    
+    if (!audio) {
+      console.log(`오디오 요소 없음: ${type}`);
+      return;
+    }
+    
+    if (!gameState.audioLoaded[type]) {
+      console.log(`오디오 로드되지 않음: ${type}`);
+      return;
+    }
+    
+    console.log(`오디오 재생: ${type}`);
+    audio.currentTime = 0;
+    audio.play().catch(error => {
+      console.error(`오디오 재생 실패: ${type}`, error);
     });
-  } else {
-    // TTS 폴백
-    playTTS('체크메이트');
   }
-}
 
-// 킹 체크 상태 하이라이트 함수
-function highlightKingInCheck(color) {
-  // 킹 찾기
-  let kingSquare = null;
-  
-  for (let row = 0; row < 8; row++) {
-    for (let col = 0; col < 8; col++) {
-      const piece = gameBoard[row][col];
-      if (piece && piece.type === 'king' && piece.color === color) {
-        // 플레이어 시점에 따른 좌표 계산
-        const isBlack = playerColor === 'black';
-        const uiRow = isBlack ? 7 - row : row;
-        const uiCol = isBlack ? col : 7 - col;
-        
-        const selector = `[data-row="${row}"][data-col="${col}"]`;
-        kingSquare = document.querySelector(selector);
-        break;
+  // 이동 정보를 분석해서 캐슬링 타입을 감지하는 함수
+  static detectCastling(fromRow, fromCol, toRow, toCol, piece) {
+    if (piece && piece.type === 'king' && Math.abs(toCol - fromCol) === 2) {
+      // 킹이 2칸 이동했다면 캐슬링
+      if (toCol > fromCol) {
+        return 'kingside';  // 오른쪽으로 이동 = 킹사이드 캐슬링
+      } else {
+        return 'queenside'; // 왼쪽으로 이동 = 퀸사이드 캐슬링
       }
     }
-    if (kingSquare) break;
-  }
-  
-  if (kingSquare) {
-    // 체크 효과 추가
-    kingSquare.classList.add('king-in-check');
-    
-    // 2초 후에 효과 제거
-    setTimeout(() => {
-      kingSquare.classList.remove('king-in-check');
-    }, 2000);
+    return null;
   }
 }
 
-// 게임 오버 이벤트 처리 개선
-socket.on('gameOver', (data) => {
-  // 체크메이트 TTS 재생
-  playCheckmateSound();
-  
-  // 결과 메시지 표시
-  const resultMessage = data.message || (data.winner === playerColor ? '승리!' : '패배!');
-  showNotification(`게임 종료! ${resultMessage}`);
-  myTurn = false;
-  
-  // 게임 상태 업데이트
-  gameStatusEl.textContent = `게임 종료: ${resultMessage}`;
-  gameStatusEl.className = data.winner === playerColor ? 'win-status' : 'lose-status';
-  
-  // 승자의 킹에 효과 표시
-  highlightWinnerKing(data.winner);
-  
-  // 재시작 버튼 표시
-  restartBtn.style.display = 'block';
-  
-  // 킹이 잡혔을 때 특별 효과
-  if (data.message && data.message.includes('왕이 잡혔습니다')) {
-    // 화면에 승패 효과 추가
-    const resultEffect = document.createElement('div');
-    resultEffect.className = 'game-result-effect';
-    resultEffect.textContent = data.winner === playerColor ? '승리!' : '패배!';
-    resultEffect.classList.add(data.winner === playerColor ? 'win' : 'lose');
-    document.body.appendChild(resultEffect);
+// UI 관리 클래스
+class UIManager {
+  static showScreen(screenName) {
+    const screens = ['lobby', 'gameSetup', 'gameBoard'];
+    screens.forEach(screen => {
+      elements[screen].style.display = screen === screenName ? 'block' : 'none';
+    });
+  }
+
+  static showNotification(message) {
+    elements.notificationEl.textContent = message;
+    elements.notificationEl.style.display = 'block';
+    elements.notificationEl.style.opacity = '1';
     
-    // 3초 후 효과 제거
     setTimeout(() => {
-      document.body.removeChild(resultEffect);
+      elements.notificationEl.style.opacity = '0';
+      setTimeout(() => {
+        elements.notificationEl.style.display = 'none';
+      }, 300);
     }, 3000);
   }
-});
 
-// 승자의 킹에 효과 표시
-function highlightWinnerKing(winnerColor) {
-  // 승자 킹 찾기
-  for (let row = 0; row < 8; row++) {
-    for (let col = 0; col < 8; col++) {
-      const piece = gameBoard[row][col];
-      if (piece && piece.type === 'king' && piece.color === winnerColor) {
-        const selector = `[data-row="${row}"][data-col="${col}"]`;
-        const kingSquare = document.querySelector(selector);
-        
-        if (kingSquare) {
-          kingSquare.classList.add('king-winner');
-          // 효과는 게임 재시작까지 유지
-        }
-        return;
-      }
+  static updateGameInfo() {
+    if (elements.playerColorEl) {
+      elements.playerColorEl.textContent = `내 색상: ${gameState.playerColor === 'white' ? '백' : '흑'}`;
+    }
+    if (elements.currentTurnEl) {
+      elements.currentTurnEl.textContent = `현재 턴: ${gameState.currentTurn === 'white' ? '백' : '흑'}`;
     }
   }
-}
 
-socket.on('gameRestarted', (data) => {
-  gameBoard = data.board;
-  currentTurn = data.turn;
-  myTurn = data.turn === playerColor;
-  
-  // 게임 상태 초기화
-  gameStatusEl.textContent = '';
-  gameStatusEl.className = '';
-  restartBtn.style.display = 'none';
-  
-  // 체스판 렌더링
-  renderBoard(gameBoard);
-  
-  // 게임 재시작 알림
-  showNotification('게임이 재시작되었습니다.');
-});
+  static updateBackgroundColor() {
+    document.body.className = gameState.currentTurn === 'black' ? 'black-turn' : 'white-turn';
+  }
 
-socket.on('playerDisconnected', () => {
-  showNotification('상대방이 게임에서 나갔습니다.');
-  myTurn = false;
-  restartBtn.style.display = 'none';
-  
-  // 게임 설정 화면으로 돌아가기
-  setTimeout(backToLobby, 3000);
-});
-
-socket.on('playerLeft', () => {
-  showNotification('상대방이 게임에서 나갔습니다.');
-  myTurn = false;
-  restartBtn.style.display = 'none';
-  
-  // 게임 설정 화면으로 돌아가기
-  setTimeout(backToLobby, 3000);
-});
-
-// 방장이 되었을 때 처리
-socket.on('becomeHost', (data) => {
-  // 플레이어 정보 업데이트
-  playerColor = data.color; // 흑에서 백으로 변경
-  
-  // 대기실로 돌아가기
-  backToLobby();
-  
-  // 알림 표시
-  showNotification(data.message);
-});
-
-// 상대방 대기 중 처리
-socket.on('waitingForPlayer', (data) => {
-  // 게임 보드에서 대기 화면으로 전환
-  gameBoard_el.style.display = 'none';
-  gameSetup.style.display = 'block';
-  
-  // 방 정보 및 대기 메시지 업데이트
-  roomInfo.textContent = `방 ID: ${currentRoom}`;
-  waitingMsg.textContent = data.message;
-  
-  // 알림 표시
-  showNotification(data.message);
-});
-
-socket.on('error', (message) => {
-  showNotification(message);
-});
-
-// 체스 규칙 패널 토글
-function toggleRulesPanel() {
-  if (chessRulesPanel) {
-    chessRulesPanel.style.display = 
-      chessRulesPanel.style.display === 'block' ? 'none' : 'block';
+  static displayRoomList(rooms) {
+    elements.roomList.innerHTML = '';
+    
+    if (rooms.length === 0) {
+      const noRoomsMsg = document.createElement('div');
+      noRoomsMsg.className = 'no-rooms-message';
+      noRoomsMsg.textContent = '현재 참가할 수 있는 방이 없습니다.';
+      elements.roomList.appendChild(noRoomsMsg);
+      return;
+    }
+    
+    rooms.forEach(room => {
+      const roomItem = elements.roomItemTemplate.content.cloneNode(true);
+      roomItem.querySelector('.room-id').textContent = room.id;
+      
+      const joinBtn = roomItem.querySelector('.join-btn');
+      joinBtn.addEventListener('click', () => RoomManager.joinRoom(room.id));
+      
+      elements.roomList.appendChild(roomItem);
+    });
   }
 }
 
-// 체스 규칙 패널 닫기
-function closeRulesPanel() {
-  if (chessRulesPanel) {
-    chessRulesPanel.style.display = 'none';
+// 방 관리 클래스
+class RoomManager {
+  static createRoom() {
+    gameState.playerName = elements.playerNameInput.value.trim() || '익명';
+    const roomId = elements.roomIdInput.value.trim();
+    
+    if (!roomId) {
+      UIManager.showNotification('방 아이디를 입력해주세요.');
+      return;
+    }
+    
+    socket.emit('createRoom', { roomId, playerName: gameState.playerName });
+  }
+
+  static joinRoom(roomId) {
+    gameState.playerName = elements.playerNameInput.value.trim() || '익명';
+    
+    if (!roomId) {
+      UIManager.showNotification('방 아이디가 없습니다.');
+      return;
+    }
+    
+    socket.emit('joinRoom', { roomId, playerName: gameState.playerName });
+  }
+
+  static leaveRoom() {
+    if (gameState.currentRoom) {
+      socket.emit('leaveRoom', gameState.currentRoom);
+      this.backToLobby();
+    }
+  }
+
+  static backToLobby() {
+    Object.assign(gameState, {
+      currentRoom: null,
+      playerColor: null,
+      gameBoard: null,
+      selectedSquare: null,
+      myTurn: false
+    });
+    
+    UIManager.showScreen('lobby');
+    this.getRoomList();
+  }
+
+  static getRoomList() {
+    socket.emit('getRoomList');
   }
 }
 
-// 체스말 이동 소리 재생 함수
-function playMoveSound(isCapture = false) {
-  const audio = isCapture ? captureAudio : moveAudio;
-  const audioType = isCapture ? 'capture' : 'move';
-  
-  if (audio && audioLoaded[audioType]) {
-    audio.currentTime = 0;
-    audio.play()
-      .then(() => console.log(`${isCapture ? '캡처' : '이동'} 소리 재생`))
-      .catch(e => {
-        console.error('오디오 재생 실패:', e);
-        // TTS 폴백 사용
-        playTTS(isCapture ? '캡처' : '이동');
+// 체스판 렌더링 클래스
+class BoardRenderer {
+  static render(boardData) {
+    if (!boardData) return;
+    
+    gameState.gameBoard = boardData;
+    elements.board.innerHTML = '';
+    
+    const isWhite = gameState.playerColor === 'white';
+    
+    // 흑 플레이어일 때는 보드를 뒤집어서 렌더링
+    const rowOrder = isWhite ? Array.from({length: 8}, (_, i) => i) : Array.from({length: 8}, (_, i) => 7 - i);
+    const colOrder = isWhite ? Array.from({length: 8}, (_, i) => i) : Array.from({length: 8}, (_, i) => 7 - i);
+    
+    for (let displayRow = 0; displayRow < 8; displayRow++) {
+      for (let displayCol = 0; displayCol < 8; displayCol++) {
+        const actualRow = rowOrder[displayRow];
+        const actualCol = colOrder[displayCol];
+        
+        const square = this.createSquare(actualRow, actualCol, displayRow, displayCol);
+        const piece = boardData[actualRow][actualCol];
+        
+        if (piece) {
+          square.appendChild(this.createPieceElement(piece));
+        }
+        
+        elements.board.appendChild(square);
+      }
+    }
+    
+    UIManager.updateGameInfo();
+    UIManager.updateBackgroundColor();
+  }
+
+  static createSquare(actualRow, actualCol, displayRow, displayCol) {
+    const square = document.createElement('div');
+    square.className = 'square';
+    
+    // 체스판 색상은 display 좌표 기준으로 결정
+    square.classList.add((displayRow + displayCol) % 2 === 0 ? 'white' : 'black');
+    
+    // 실제 데이터 좌표 저장
+    square.dataset.row = actualRow;
+    square.dataset.col = actualCol;
+    square.addEventListener('click', GameLogic.handleSquareClick);
+    
+    return square;
+  }
+
+  static createPieceElement(piece) {
+    const pieceEl = document.createElement('img');
+    pieceEl.className = 'chess-piece';
+    pieceEl.src = CONSTANTS.PIECE_IMAGES[piece.color][piece.type];
+    pieceEl.alt = `${piece.color} ${piece.type}`;
+    pieceEl.draggable = false;
+    
+    return pieceEl;
+  }
+
+  static clearSelection() {
+    document.querySelectorAll('.square').forEach(square => {
+      square.classList.remove('selected', ...Object.values(CONSTANTS.MOVE_TYPES));
+    });
+    gameState.selectedSquare = null;
+  }
+}
+
+// 게임 로직 클래스
+class GameLogic {
+  static handleSquareClick(event) {
+    if (!gameState.myTurn) return;
+    
+    const square = event.currentTarget;
+    const row = parseInt(square.dataset.row);
+    const col = parseInt(square.dataset.col);
+    
+    if (gameState.selectedSquare) {
+      GameLogic.handleMoveAttempt(row, col);
+    } else {
+      GameLogic.handlePieceSelection(row, col, square);
+    }
+  }
+
+  static handleMoveAttempt(row, col) {
+    const [fromRow, fromCol] = gameState.selectedSquare;
+    
+    socket.emit('movePiece', {
+      roomId: gameState.currentRoom,
+      from: [fromRow, fromCol],
+      to: [row, col],
+      color: gameState.playerColor
+    });
+    
+    BoardRenderer.clearSelection();
+  }
+
+  static handlePieceSelection(row, col, square) {
+    const piece = GameLogic.getPieceAt(row, col);
+    
+    if (piece && piece.color === gameState.playerColor) {
+      BoardRenderer.clearSelection();
+      square.classList.add('selected');
+      gameState.selectedSquare = [row, col];
+      GameLogic.showPossibleMoves(row, col, piece);
+    }
+  }
+
+  static getPieceAt(row, col) {
+    return gameState.gameBoard && gameState.gameBoard[row] ? gameState.gameBoard[row][col] : null;
+  }
+
+  static showPossibleMoves(row, col, piece) {
+    // 실제로는 서버에서 검증하므로 간단한 시각적 표시만 제공
+    const possibleMoves = [];
+    
+    // 폰의 경우
+    if (piece.type === 'pawn') {
+      const direction = piece.color === 'white' ? -1 : 1;
+      const startRow = piece.color === 'white' ? 6 : 1;
+      
+      // 앞으로 한 칸
+      if (GameLogic.isValidPosition(row + direction, col) && !GameLogic.getPieceAt(row + direction, col)) {
+        possibleMoves.push({ row: row + direction, col: col, type: CONSTANTS.MOVE_TYPES.VALID_MOVE });
+        
+        // 첫 이동시 두 칸
+        if (row === startRow && !GameLogic.getPieceAt(row + 2 * direction, col)) {
+          possibleMoves.push({ row: row + 2 * direction, col: col, type: CONSTANTS.MOVE_TYPES.VALID_MOVE });
+        }
+      }
+      
+      // 대각선 공격
+      [-1, 1].forEach(colOffset => {
+        const newRow = row + direction;
+        const newCol = col + colOffset;
+        if (GameLogic.isValidPosition(newRow, newCol)) {
+          const targetPiece = GameLogic.getPieceAt(newRow, newCol);
+          if (targetPiece && targetPiece.color !== piece.color) {
+            possibleMoves.push({ row: newRow, col: newCol, type: CONSTANTS.MOVE_TYPES.VALID_CAPTURE });
+          }
+        }
       });
-  } else {
-    // 오디오 파일이 없거나 로드되지 않은 경우 대체 방법으로 TTS 사용
-    playTTS(isCapture ? '캡처' : '이동');
+      
+      // 앙파상 (En passant) - 간단한 검사
+      [-1, 1].forEach(colOffset => {
+        const newCol = col + colOffset;
+        if (GameLogic.isValidPosition(row, newCol)) {
+          const sidePiece = GameLogic.getPieceAt(row, newCol);
+          if (sidePiece && sidePiece.type === 'pawn' && sidePiece.color !== piece.color) {
+            possibleMoves.push({ row: row + direction, col: newCol, type: CONSTANTS.MOVE_TYPES.VALID_EN_PASSANT });
+          }
+        }
+      });
+    } else if (piece.type === 'king') {
+      // 킹의 일반 이동
+      const directions = GameLogic.getPieceDirections(piece.type);
+      directions.forEach(direction => {
+        const moves = GameLogic.calculateDirectionalMoves(row, col, direction, piece);
+        possibleMoves.push(...moves);
+      });
+      
+      // 캐슬링 체크
+      const castlingMoves = GameLogic.checkCastlingMoves(row, col, piece);
+      possibleMoves.push(...castlingMoves);
+    } else {
+      // 다른 말들의 경우 간단한 방향성 표시
+      const directions = GameLogic.getPieceDirections(piece.type);
+      directions.forEach(direction => {
+        const moves = GameLogic.calculateDirectionalMoves(row, col, direction, piece);
+        possibleMoves.push(...moves);
+      });
+    }
+    
+    possibleMoves.forEach(move => {
+      const targetSquare = document.querySelector(`[data-row="${move.row}"][data-col="${move.col}"]`);
+      if (targetSquare) {
+        targetSquare.classList.add(move.type);
+      }
+    });
+  }
+
+  static calculatePossibleMoves(row, col, piece) {
+    const moves = [];
+    const directions = GameLogic.getPieceDirections(piece.type);
+    
+    directions.forEach(direction => {
+      const pieceMoves = GameLogic.calculateDirectionalMoves(row, col, direction, piece);
+      moves.push(...pieceMoves);
+    });
+    
+    return moves;
+  }
+
+  static getPieceDirections(pieceType) {
+    const directions = {
+      pawn: [[1, 0], [1, 1], [1, -1], [2, 0]],
+      rook: [[1, 0], [-1, 0], [0, 1], [0, -1]],
+      knight: [[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]],
+      bishop: [[1, 1], [1, -1], [-1, 1], [-1, -1]],
+      queen: [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]],
+      king: [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]
+    };
+    
+    return directions[pieceType] || [];
+  }
+
+  static calculateDirectionalMoves(row, col, direction, piece) {
+    const moves = [];
+    const [rowStep, colStep] = direction;
+    let newRow = row + rowStep;
+    let newCol = col + colStep;
+    
+    while (GameLogic.isValidPosition(newRow, newCol)) {
+      const targetPiece = GameLogic.getPieceAt(newRow, newCol);
+      
+      if (targetPiece) {
+        if (targetPiece.color !== piece.color) {
+          moves.push({ 
+            row: newRow, 
+            col: newCol, 
+            type: CONSTANTS.MOVE_TYPES.VALID_CAPTURE 
+          });
+        }
+        break;
+      } else {
+        moves.push({ 
+          row: newRow, 
+          col: newCol, 
+          type: CONSTANTS.MOVE_TYPES.VALID_MOVE 
+        });
+      }
+      
+      if (piece.type === 'pawn' || piece.type === 'knight' || piece.type === 'king') {
+        break;
+      }
+      
+      newRow += rowStep;
+      newCol += colStep;
+    }
+    
+    return moves;
+  }
+
+  static isValidPosition(row, col) {
+    return row >= 0 && row < 8 && col >= 0 && col < 8;
+  }
+
+  static checkCastlingMoves(row, col, piece) {
+    const castlingMoves = [];
+    
+    // 킹이 초기 위치에 있는지 확인
+    const kingStartRow = piece.color === 'white' ? 7 : 0;
+    const kingStartCol = 4;
+    
+    if (row !== kingStartRow || col !== kingStartCol) {
+      return castlingMoves;
+    }
+    
+    // 킹사이드 캐슬링 (짧은 캐슬링)
+    const kingsideRook = GameLogic.getPieceAt(kingStartRow, 7);
+    if (kingsideRook && kingsideRook.type === 'rook' && kingsideRook.color === piece.color) {
+      // 킹과 룩 사이에 말이 없는지 확인
+      let canCastleKingside = true;
+      for (let c = 5; c <= 6; c++) {
+        if (GameLogic.getPieceAt(kingStartRow, c)) {
+          canCastleKingside = false;
+          break;
+        }
+      }
+      
+      if (canCastleKingside) {
+        castlingMoves.push({ 
+          row: kingStartRow, 
+          col: 6, 
+          type: CONSTANTS.MOVE_TYPES.VALID_CASTLING 
+        });
+      }
+    }
+    
+    // 퀸사이드 캐슬링 (긴 캐슬링)
+    const queensideRook = GameLogic.getPieceAt(kingStartRow, 0);
+    if (queensideRook && queensideRook.type === 'rook' && queensideRook.color === piece.color) {
+      // 킹과 룩 사이에 말이 없는지 확인
+      let canCastleQueenside = true;
+      for (let c = 1; c <= 3; c++) {
+        if (GameLogic.getPieceAt(kingStartRow, c)) {
+          canCastleQueenside = false;
+          break;
+        }
+      }
+      
+      if (canCastleQueenside) {
+        castlingMoves.push({ 
+          row: kingStartRow, 
+          col: 2, 
+          type: CONSTANTS.MOVE_TYPES.VALID_CASTLING 
+        });
+      }
+    }
+    
+    return castlingMoves;
+  }
+
+  static restartGame() {
+    socket.emit('restartGame', gameState.currentRoom);
   }
 }
 
-// 페이지 로드시 초기화
-init(); 
+// 이벤트 핸들러 설정
+class EventManager {
+  static init() {
+    // 버튼 이벤트
+    elements.createRoomBtn.addEventListener('click', RoomManager.createRoom);
+    elements.refreshRoomListBtn.addEventListener('click', RoomManager.getRoomList);
+    elements.backToLobbyBtn.addEventListener('click', RoomManager.backToLobby);
+    elements.restartBtn.addEventListener('click', GameLogic.restartGame);
+    elements.leaveGameBtn.addEventListener('click', RoomManager.leaveRoom);
+    
+    // 체스 규칙 패널
+    if (elements.showRulesBtn) {
+      elements.showRulesBtn.addEventListener('click', EventManager.toggleRulesPanel);
+    }
+    if (elements.closeRulesBtn) {
+      elements.closeRulesBtn.addEventListener('click', EventManager.closeRulesPanel);
+    }
+
+    // 소켓 이벤트
+    EventManager.setupSocketEvents();
+  }
+
+  static setupSocketEvents() {
+    socket.on('roomList', UIManager.displayRoomList);
+    
+    socket.on('roomListUpdated', () => {
+      RoomManager.getRoomList();
+    });
+    
+    socket.on('roomCreated', (data) => {
+      gameState.currentRoom = data.roomId;
+      gameState.playerColor = data.color;
+      UIManager.showScreen('gameSetup');
+      elements.roomInfo.textContent = `방 아이디: ${data.roomId}`;
+    });
+    
+    socket.on('roomJoined', (data) => {
+      gameState.currentRoom = data.roomId;
+      gameState.playerColor = data.color;
+      UIManager.showScreen('gameSetup');
+      elements.roomInfo.textContent = `방 아이디: ${data.roomId}`;
+    });
+    
+    socket.on('opponentJoined', (data) => {
+      UIManager.showNotification(`${data.opponentName}님이 게임에 참가했습니다.`);
+    });
+    
+    socket.on('gameStart', (data) => {
+      UIManager.showScreen('gameBoard');
+      
+      // 턴 정보를 먼저 업데이트
+      gameState.currentTurn = data.turn;
+      gameState.myTurn = gameState.playerColor === data.turn;
+      
+      // 보드 렌더링 (이때 올바른 턴 정보로 UI 업데이트됨)
+      BoardRenderer.render(data.board);
+      
+      elements.whitePlayerInfo.textContent = `백: ${data.whitePlayer}`;
+      elements.blackPlayerInfo.textContent = `흑: ${data.blackPlayer}`;
+      
+      if (gameState.myTurn) {
+        UIManager.showNotification('게임이 시작되었습니다. 당신의 턴입니다.');
+      } else {
+        UIManager.showNotification('게임이 시작되었습니다. 상대방의 턴을 기다리세요.');
+      }
+    });
+    
+    socket.on('boardUpdate', (data) => {
+      // 턴 정보를 먼저 업데이트
+      gameState.currentTurn = data.turn;
+      gameState.myTurn = gameState.playerColor === data.turn;
+      
+      // 보드 렌더링 (이때 올바른 턴 정보로 UI 업데이트됨)
+      BoardRenderer.render(data.board);
+      
+      if (data.moveDetails) {
+        // 서버에서 캐슬링 정보를 보낸 경우
+        if (data.moveDetails.castling) {
+          if (data.moveDetails.castling === 'kingside') {
+            audioManager.play('king-castling');
+          } else if (data.moveDetails.castling === 'queenside') {
+            audioManager.play('queen-castling');
+          }
+        } 
+        // 서버에서 캐슬링 정보를 안 보낸 경우 클라이언트에서 감지
+        else if (data.moveDetails.from && data.moveDetails.to) {
+          const [fromRow, fromCol] = data.moveDetails.from;
+          const [toRow, toCol] = data.moveDetails.to;
+          const piece = data.moveDetails.piece;
+          
+          const castlingType = AudioManager.detectCastling(fromRow, fromCol, toRow, toCol, piece);
+          if (castlingType) {
+            if (castlingType === 'kingside') {
+              audioManager.play('king-castling');
+            } else if (castlingType === 'queenside') {
+              audioManager.play('queen-castling');
+            }
+          } else {
+            // 일반 이동 또는 캡처 소리 재생
+            audioManager.play(data.moveDetails.capture ? 'capture' : 'move');
+          }
+        } else {
+          // 이동 정보가 없으면 기본 소리 재생
+          audioManager.play(data.moveDetails.capture ? 'capture' : 'move');
+        }
+      }
+      
+      if (data.status === 'checkmate') {
+        elements.gameStatusEl.textContent = '체크메이트!';
+        elements.restartBtn.style.display = 'block';
+      } else if (gameState.myTurn) {
+        UIManager.showNotification('당신의 턴입니다.');
+      }
+    });
+    
+    socket.on('check', (data) => {
+      audioManager.play('check');
+      elements.gameStatusEl.textContent = '체크!';
+      elements.gameStatusEl.className = 'check-status';
+      UIManager.showNotification('체크!');
+    });
+    
+    socket.on('gameOver', (data) => {
+      UIManager.showNotification(`게임 종료: ${data.message}`);
+      audioManager.play('checkmate');
+      gameState.myTurn = false;
+      
+      elements.gameStatusEl.textContent = `게임 종료: ${data.message}`;
+      elements.gameStatusEl.className = data.winner === gameState.playerColor ? 'win-status' : 'lose-status';
+      elements.restartBtn.style.display = 'block';
+    });
+    
+    socket.on('gameRestarted', (data) => {
+      // 턴 정보를 먼저 업데이트
+      gameState.currentTurn = data.turn;
+      gameState.myTurn = gameState.playerColor === data.turn;
+      
+      // 보드 렌더링 (이때 올바른 턴 정보로 UI 업데이트됨)
+      BoardRenderer.render(data.board);
+      
+      elements.gameStatusEl.textContent = '';
+      elements.gameStatusEl.className = '';
+      elements.restartBtn.style.display = 'none';
+      
+      UIManager.showNotification('게임이 재시작되었습니다.');
+    });
+    
+    socket.on('playerDisconnected', () => {
+      UIManager.showNotification('상대방이 게임에서 나갔습니다.');
+      gameState.myTurn = false;
+      elements.restartBtn.style.display = 'none';
+      
+      setTimeout(() => RoomManager.backToLobby(), 3000);
+    });
+    
+    socket.on('playerLeft', () => {
+      UIManager.showNotification('상대방이 게임에서 나갔습니다.');
+      gameState.myTurn = false;
+      elements.restartBtn.style.display = 'none';
+      
+      setTimeout(() => RoomManager.backToLobby(), 3000);
+    });
+    
+    socket.on('becomeHost', (data) => {
+      gameState.playerColor = data.color;
+      RoomManager.backToLobby();
+      UIManager.showNotification(data.message);
+    });
+    
+    socket.on('waitingForPlayer', (data) => {
+      UIManager.showScreen('gameSetup');
+      elements.roomInfo.textContent = `방 아이디: ${gameState.currentRoom}`;
+      elements.waitingMsg.textContent = data.message;
+      UIManager.showNotification(data.message);
+    });
+    
+    socket.on('error', (message) => {
+      UIManager.showNotification(message);
+    });
+  }
+
+  static toggleRulesPanel() {
+    const panel = elements.chessRulesPanel;
+    panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+  }
+
+  static closeRulesPanel() {
+    elements.chessRulesPanel.style.display = 'none';
+  }
+}
+
+// 전역 인스턴스
+const audioManager = new AudioManager();
+
+// 오디오 테스트 함수
+function testAllAudio() {
+  console.log('=== 오디오 테스트 시작 ===');
+  Object.keys(elements.audio).forEach(key => {
+    console.log(`${key}: 요소=${!!elements.audio[key]}, 로드됨=${gameState.audioLoaded[key]}`);
+  });
+  console.log('=== 오디오 테스트 종료 ===');
+}
+
+// 초기화
+function init() {
+  EventManager.init();
+  RoomManager.getRoomList();
+  
+  // 3초 후 오디오 테스트
+  setTimeout(testAllAudio, 3000);
+}
+
+// 페이지 로드 시 초기화
+document.addEventListener('DOMContentLoaded', init); 
