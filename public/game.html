@@ -3,121 +3,214 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>소켓 체스 게임</title>
+  <title>소켓 체스 게임 - 플레이</title>
+  <link rel="stylesheet" href="main.css">
   <link rel="stylesheet" href="styles.css">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="container">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-      <h1>소켓 체스 게임</h1>
-      <a href="index.html" class="btn" style="background-color: var(--secondary-accent); color: white; text-decoration: none; padding: 8px 15px; border-radius: 5px; font-size: 14px;">
-        <i class="fas fa-home" style="margin-right: 5px;"></i>홈으로
-      </a>
+  <!-- 헤더 및 네비게이션 -->
+  <header id="header" class="header">
+    <div class="container">
+      <div class="logo">
+        <h1><i class="fas fa-chess-king"></i> 체스 게임</h1>
+      </div>
+      <nav class="nav">
+        <ul class="nav-list">
+          <li><a href="index.html" class="nav-link">홈</a></li>
+          <li><a href="#lobby" class="nav-link">대기실</a></li>
+          <li><a href="#gameBoard" class="nav-link">게임</a></li>
+        </ul>
+      </nav>
+      <div class="mobile-nav-toggle">
+        <i class="fas fa-bars"></i>
+      </div>
     </div>
+  </header>
+
+  <!-- 게임 메인 콘텐츠 -->
+  <main class="game-main">
+    <div class="container" style="margin-top: 80px; padding-top: 40px;">
     
-    <!-- 로비 화면 -->
-    <div id="lobby" class="game-section">
-      <h2>대기실</h2>
-      
-      <div class="user-form">
-        <div class="form-group">
-          <label for="playerNameInput">플레이어 이름</label>
-          <input type="text" id="playerNameInput" placeholder="이름을 입력하세요">
+      <!-- 로비 화면 -->
+      <section id="lobby" class="game-section lobby-section">
+        <div class="section-header">
+          <h2><i class="fas fa-users"></i> 대기실</h2>
+          <p>플레이어 정보를 입력하고 게임 방을 생성하거나 참가하세요</p>
         </div>
-      </div>
-      
-      <div class="room-section">
-        <h3>방 만들기</h3>
-        <div class="form-group">
-          <input type="text" id="roomIdInput" placeholder="방 아이디를 입력하세요">
-          <button id="createRoomBtn">방 만들기</button>
-        </div>
-      </div>
-      
-      <div class="room-list-section">
-        <h3>참가 가능한 방</h3>
-        <button id="refreshRoomListBtn">새로고침</button>
         
-        <div id="roomList" class="room-list">
-          <div class="no-rooms-message">현재 참가할 수 있는 방이 없습니다.</div>
+        <div class="lobby-content">
+          <div class="user-form-card">
+            <h3><i class="fas fa-user"></i> 플레이어 정보</h3>
+            <div class="form-group">
+              <label for="playerNameInput">플레이어 이름</label>
+              <input type="text" id="playerNameInput" placeholder="이름을 입력하세요">
+            </div>
+          </div>
+          
+          <div class="room-actions">
+            <div class="room-create-card">
+              <h3><i class="fas fa-plus-circle"></i> 방 만들기</h3>
+              <div class="form-group">
+                <input type="text" id="roomIdInput" placeholder="방 아이디를 입력하세요">
+                <button id="createRoomBtn" class="btn btn-primary">
+                  <i class="fas fa-plus"></i> 방 만들기
+                </button>
+              </div>
+            </div>
+            
+            <div class="room-list-card">
+              <div class="room-list-header">
+                <h3><i class="fas fa-list"></i> 참가 가능한 방</h3>
+                <button id="refreshRoomListBtn" class="btn btn-outline">
+                  <i class="fas fa-sync-alt"></i> 새로고침
+                </button>
+              </div>
+              
+              <div id="roomList" class="room-list">
+                <div class="no-rooms-message">
+                  <i class="fas fa-inbox"></i>
+                  <p>현재 참가할 수 있는 방이 없습니다.</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+      </section>
+    
+          <!-- 대기 화면 -->
+      <section id="gameSetup" class="game-section waiting-section" style="display: none;">
+        <div class="section-header">
+          <h2><i class="fas fa-clock"></i> 게임 대기</h2>
+        </div>
+        <div class="waiting-content">
+          <div class="waiting-card">
+            <div class="waiting-icon">
+              <i class="fas fa-hourglass-half"></i>
+            </div>
+            <div id="roomInfo" class="room-info"></div>
+            <div id="waitingMsg" class="waiting-message">상대방을 기다리는 중입니다...</div>
+            <div class="waiting-actions">
+              <button id="backToLobbyBtn" class="btn btn-outline">
+                <i class="fas fa-arrow-left"></i> 대기실로 돌아가기
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    
+          <!-- 게임 화면 -->
+      <section id="gameBoard" class="game-section game-play-section" style="display: none;">
+        <div class="section-header">
+          <h2><i class="fas fa-chess-board"></i> 체스 게임</h2>
+        </div>
+        
+        <div class="game-layout">
+          <div class="game-sidebar">
+            <div class="game-info-card">
+              <h3><i class="fas fa-info-circle"></i> 게임 정보</h3>
+              <div id="playerColor" class="player-color-info"></div>
+              <div id="currentTurn" class="current-turn-info"></div>
+              <div id="gameStatus" class="game-status-info"></div>
+            </div>
+            
+            <div class="players-info-card">
+              <h3><i class="fas fa-users"></i> 플레이어</h3>
+              <div class="players-list">
+                <div id="whitePlayerInfo" class="player-info white-player">
+                  <i class="fas fa-circle" style="color: white; border: 1px solid #ccc; border-radius: 50%;"></i>
+                  <span>백: </span>
+                </div>
+                <div id="blackPlayerInfo" class="player-info black-player">
+                  <i class="fas fa-circle" style="color: #333;"></i>
+                  <span>흑: </span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 체스 이동 범례 -->
+            <div class="legend-card">
+              <h3><i class="fas fa-map"></i> 이동 가이드</h3>
+              <div class="legend">
+                <div class="legend-item">
+                  <div class="legend-color legend-valid-move"></div>
+                  <span>이동 가능</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color legend-valid-capture"></div>
+                  <span>공격 가능</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color legend-castling"></div>
+                  <span>캐슬링</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color legend-en-passant"></div>
+                  <span>앙파상</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="game-controls-card">
+              <h3><i class="fas fa-gamepad"></i> 게임 제어</h3>
+              <div class="game-controls">
+                <button id="restartBtn" class="btn btn-primary" style="display: none;">
+                  <i class="fas fa-redo"></i> 게임 재시작
+                </button>
+                <button id="leaveGameBtn" class="btn btn-outline">
+                  <i class="fas fa-sign-out-alt"></i> 게임 나가기
+                </button>
+                <button id="showRulesBtn" class="btn btn-outline">
+                  <i class="fas fa-book"></i> 체스 규칙
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="board-container">
+            <div id="board" class="chess-board"></div>
+          </div>
+        </div>
+      </section>
+        </div>
+  </main>
+
+  <!-- 알림 -->
+  <div id="notification" class="notification"></div>
+  
+  <!-- 체스 규칙 설명 패널 -->
+  <div id="chessRulesPanel" class="chess-rules-panel">
+    <button class="close-btn" id="closeRulesBtn">&times;</button>
+    <h4><i class="fas fa-book"></i> 체스 특수 규칙</h4>
+    <div class="rules-content">
+      <div class="rule-item">
+        <h5><i class="fas fa-chess-rook"></i> 캐슬링</h5>
+        <p>킹과 룩이 아직 움직이지 않았고, 경로에 말이 없으며, 킹이 체크 상태가 아닐 때 가능합니다. 킹이 룩 방향으로 두 칸 이동하고, 룩은 킹을 뛰어넘어 반대편에 위치합니다.</p>
+      </div>
+      <div class="rule-item">
+        <h5><i class="fas fa-chess-pawn"></i> 앙파상</h5>
+        <p>상대 폰이 두 칸 전진했을 때, 바로 다음 턴에 내 폰이 그 폰 옆에서 대각선으로 이동하면 상대 폰을 잡을 수 있습니다.</p>
+      </div>
+      <div class="rule-item">
+        <h5><i class="fas fa-exclamation-triangle"></i> 체크</h5>
+        <p>킹이 공격받는 상태로, 킹을 보호하거나 이동시켜야 합니다.</p>
+      </div>
+      <div class="rule-item">
+        <h5><i class="fas fa-crown"></i> 체크메이트</h5>
+        <p>킹이 체크 상태이며 이를 피할 방법이 없을 때 게임이 종료됩니다.</p>
       </div>
     </div>
-    
-    <!-- 대기 화면 -->
-    <div id="gameSetup" class="game-section" style="display: none;">
-      <h2>게임 대기</h2>
-      <p id="roomInfo"></p>
-      <p id="waitingMsg">상대방을 기다리는 중입니다...</p>
-      <button id="backToLobbyBtn" class="secondary-btn">대기실로 돌아가기</button>
-    </div>
-    
-    <!-- 게임 화면 -->
-    <div id="gameBoard" class="game-section" style="display: none;">
-      <div class="game-info">
-        <div id="playerColor"></div>
-        <div id="currentTurn"></div>
-        <div id="gameStatus"></div>
-      </div>
-      
-      <div class="players-info">
-        <div id="whitePlayerInfo" class="player-info">백: </div>
-        <div id="blackPlayerInfo" class="player-info">흑: </div>
-      </div>
-      
-      <div class="board-container">
-        <div id="board" class="chess-board"></div>
-      </div>
-      
-      <!-- 체스 이동 범례 -->
-      <div class="legend">
-        <div class="legend-item">
-          <div class="legend-color legend-valid-move"></div>
-          <span>이동 가능</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-color legend-valid-capture"></div>
-          <span>공격 가능</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-color legend-castling"></div>
-          <span>캐슬링</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-color legend-en-passant"></div>
-          <span>앙파상</span>
-        </div>
-      </div>
-      
-      <div class="game-controls">
-        <button id="restartBtn" style="display: none;">게임 재시작</button>
-        <button id="leaveGameBtn" class="secondary-btn">게임 나가기</button>
-        <button id="showRulesBtn" class="show-rules-btn">체스 규칙</button>
-      </div>
-    </div>
-    
-    <div id="notification" class="notification"></div>
-    
-    <!-- 체스 규칙 설명 패널 -->
-    <div id="chessRulesPanel" class="chess-rules-panel">
-      <button class="close-btn" id="closeRulesBtn">&times;</button>
-      <h4>체스 특수 규칙</h4>
-      <p><strong>캐슬링:</strong> 킹과 룩이 아직 움직이지 않았고, 경로에 말이 없으며, 킹이 체크 상태가 아닐 때 가능합니다. 킹이 룩 방향으로 두 칸 이동하고, 룩은 킹을 뛰어넘어 반대편에 위치합니다.</p>
-      <p><strong>앙파상:</strong> 상대 폰이 두 칸 전진했을 때, 바로 다음 턴에 내 폰이 그 폰 옆에서 대각선으로 이동하면 상대 폰을 잡을 수 있습니다.</p>
-      <p><strong>체크:</strong> 킹이 공격받는 상태로, 킹을 보호하거나 이동시켜야 합니다.</p>
-      <p><strong>체크메이트:</strong> 킹이 체크 상태이며 이를 피할 방법이 없을 때 게임이 종료됩니다.</p>
-    </div>
-    
-    <!-- 오디오 요소 -->
-    <div style="display: none;">
-      <audio id="check-audio" src="sounds/Check.mp3" preload="auto" volume="0.5"></audio>
-      <audio id="checkmate-audio" src="sounds/checkmate.mp3" preload="auto" volume="0.5"></audio>
-      <audio id="move-audio" src="sounds/move.mp3" preload="auto" volume="0.5"></audio>
-      <audio id="capture-audio" src="sounds/move.mp3" preload="auto" volume="0.5"></audio>
-      <audio id="king-castling-audio" src="sounds/KingCastling.mp3" preload="auto" volume="0.5"></audio>
-      <audio id="queen-castling-audio" src="sounds/QueenCastling.mp3" preload="auto" volume="0.5"></audio>
-    </div>
+  </div>
+  
+  <!-- 오디오 요소 -->
+  <div style="display: none;">
+    <audio id="check-audio" src="sounds/Check.mp3" preload="auto" volume="0.5"></audio>
+    <audio id="checkmate-audio" src="sounds/checkmate.mp3" preload="auto" volume="0.5"></audio>
+    <audio id="move-audio" src="sounds/move.mp3" preload="auto" volume="0.5"></audio>
+    <audio id="capture-audio" src="sounds/move.mp3" preload="auto" volume="0.5"></audio>
+    <audio id="king-castling-audio" src="sounds/KingCastling.mp3" preload="auto" volume="0.5"></audio>
+    <audio id="queen-castling-audio" src="sounds/QueenCastling.mp3" preload="auto" volume="0.5"></audio>
   </div>
 
   <!-- 방 목록 아이템 템플릿 -->
@@ -126,12 +219,33 @@
       <div class="room-info">
         <h4 class="room-id"></h4>
       </div>
-      <button class="join-btn">참가</button>
+      <button class="join-btn btn btn-primary">
+        <i class="fas fa-sign-in-alt"></i> 참가
+      </button>
     </div>
   </template>
 
+  <!-- 푸터 -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-text">
+          <p>&copy; 2024 소켓 체스 게임. MIT 라이센스.</p>
+        </div>
+        <div class="footer-links">
+          <a href="index.html"><i class="fas fa-home"></i></a>
+          <a href="#"><i class="fab fa-github"></i></a>
+          <a href="#"><i class="fab fa-linkedin"></i></a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
   <!-- Socket.IO 클라이언트 라이브러리 -->
   <script src="/socket.io/socket.io.js"></script>
+  
+  <!-- 포트폴리오 스타일 스크립트 -->
+  <script src="main.js"></script>
   
   <!-- 체스 게임 클라이언트 스크립트 -->
   <script src="js/app.js"></script>
