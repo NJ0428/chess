@@ -868,7 +868,7 @@ section {
   flex-direction: column;
   gap: 15px;
   max-height: calc(100vh - 250px);
-  overflow-y: auto;
+  overflow-y: visible;
   padding-right: 5px;
 }
 
@@ -972,19 +972,13 @@ section {
 
 /* 체스 보드 컨테이너 조정 */
 .board-container {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 550px;
-  padding: 10px;
+  order: 1;
+  flex: none;
+  max-width: 650px;
 }
 
 .chess-board {
-  width: 100% !important;
-  max-width: 550px !important;
-  aspect-ratio: 1;
-  margin: 0 auto;
+  max-width: 650px !important;
 }
 
 /* 체스 보드 정사각형 강제 적용 */
@@ -1103,7 +1097,11 @@ section {
   }
   
   .chess-board {
-    max-width: 480px !important;
+    max-width: 600px !important;
+  }
+  
+  .board-container {
+    max-width: 600px;
   }
   
   .game-layout {
@@ -1172,7 +1170,7 @@ section {
   }
   
   .chess-board {
-    max-width: 350px !important;
+    max-width: 100% !important;
   }
   
   .waiting-card {
@@ -1233,7 +1231,7 @@ section {
   }
   
   .chess-board {
-    max-width: 300px !important;
+    max-width: 100% !important;
   }
   
   .board-container {
@@ -1244,4 +1242,9 @@ section {
   .game-layout {
     gap: 20px;
   }
+}
+
+/* 이동 가이드(legend-card) 숨기기 */
+.legend-card {
+  display: none !important;
 } 
