@@ -687,20 +687,35 @@ section {
 .game-main {
   min-height: calc(100vh - 80px);
   background: var(--bg-light);
-  padding-top: 80px;
+  padding-top: 100px;
+}
+
+.game-main .container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* 게임 섹션 공통 스타일 */
+.game-section {
+  margin-bottom: 0;
+  padding: 40px 0;
 }
 
 /* 로비 섹션 */
 .lobby-section {
   background: var(--bg-white);
-  padding: 60px 0;
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 40px;
+  padding: 50px 40px;
 }
 
 .lobby-content {
   display: grid;
   grid-template-columns: 1fr 2fr;
-  gap: 40px;
-  margin-top: 40px;
+  gap: 30px;
+  margin-top: 30px;
 }
 
 .user-form-card {
@@ -773,25 +788,29 @@ section {
 /* 대기 섹션 */
 .waiting-section {
   background: var(--bg-white);
-  padding: 80px 0;
-  min-height: 60vh;
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 40px;
+  padding: 60px 40px;
+  min-height: 500px;
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .waiting-content {
+  width: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 400px;
 }
 
 .waiting-card {
   background: var(--bg-light);
-  padding: 60px 40px;
+  padding: 50px 40px;
   border-radius: 20px;
   text-align: center;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow);
   max-width: 500px;
   width: 100%;
 }
@@ -830,24 +849,27 @@ section {
 /* 게임 플레이 섹션 */
 .game-play-section {
   background: var(--bg-white);
-  padding: 40px 0;
-  min-height: calc(100vh - 80px);
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg);
+  padding: 40px;
+  min-height: calc(100vh - 200px);
 }
 
 .game-layout {
   display: flex;
-  gap: 30px;
-  margin-top: 40px;
+  gap: 25px;
+  margin-top: 30px;
   align-items: flex-start;
 }
 
 .game-sidebar {
-  flex: 0 0 320px;
+  flex: 0 0 300px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-height: 80vh;
+  gap: 15px;
+  max-height: calc(100vh - 250px);
   overflow-y: auto;
+  padding-right: 5px;
 }
 
 .game-info-card,
@@ -954,13 +976,13 @@ section {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 600px;
-  padding: 20px;
+  min-height: 550px;
+  padding: 10px;
 }
 
 .chess-board {
   width: 100% !important;
-  max-width: 600px !important;
+  max-width: 550px !important;
   aspect-ratio: 1;
   margin: 0 auto;
 }
@@ -1064,67 +1086,97 @@ section {
 
 /* 반응형 디자인 - 게임 페이지 */
 @media (max-width: 1200px) {
+  .game-main {
+    padding-top: 90px;
+  }
+  
   .game-sidebar {
     flex: 0 0 280px;
+    gap: 12px;
   }
   
   .game-info-card,
   .players-info-card,
   .legend-card,
   .game-controls-card {
-    padding: 20px;
+    padding: 18px;
   }
   
   .chess-board {
-    max-width: 500px;
+    max-width: 480px !important;
+  }
+  
+  .game-layout {
+    gap: 20px;
   }
 }
 
 @media (max-width: 1024px) {
   .game-sidebar {
     flex: 0 0 260px;
-    gap: 15px;
+    gap: 12px;
   }
   
   .chess-board {
-    max-width: 450px;
+    max-width: 420px !important;
+  }
+  
+  .board-container {
+    min-height: 450px;
   }
 }
 
 @media (max-width: 768px) {
+  .game-main {
+    padding-top: 90px;
+  }
+  
+  .game-main .container {
+    padding: 0 15px;
+  }
+  
+  .lobby-section,
+  .waiting-section,
+  .game-play-section {
+    margin-bottom: 20px;
+    padding: 30px 20px;
+  }
+  
   .lobby-content {
     grid-template-columns: 1fr;
-    gap: 30px;
+    gap: 25px;
+    margin-top: 20px;
   }
   
   .game-layout {
     flex-direction: column;
-    gap: 30px;
+    gap: 25px;
+    margin-top: 20px;
   }
   
   .game-sidebar {
     flex: none;
     order: 2;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 15px;
     max-height: none;
     overflow-y: visible;
+    padding-right: 0;
   }
   
   .board-container {
     order: 1;
-    min-height: 400px;
+    min-height: 350px;
     padding: 10px;
   }
   
   .chess-board {
-    max-width: 400px;
+    max-width: 350px !important;
   }
   
   .waiting-card {
-    padding: 40px 30px;
-    margin: 0 20px;
+    padding: 40px 25px;
   }
   
   .waiting-icon {
@@ -1132,16 +1184,31 @@ section {
   }
   
   .chess-rules-panel {
-    padding: 30px 20px;
+    padding: 25px 20px;
     width: 95%;
   }
 }
 
 @media (max-width: 480px) {
+  .game-main {
+    padding-top: 85px;
+  }
+  
+  .game-main .container {
+    padding: 0 10px;
+  }
+  
+  .lobby-section,
+  .waiting-section,
+  .game-play-section {
+    padding: 25px 15px;
+    margin-bottom: 15px;
+  }
+  
   .user-form-card,
   .room-create-card,
   .room-list-card {
-    padding: 20px;
+    padding: 20px 15px;
   }
   
   .game-info-card,
@@ -1163,5 +1230,18 @@ section {
   
   .room-list-header h3 {
     text-align: center;
+  }
+  
+  .chess-board {
+    max-width: 300px !important;
+  }
+  
+  .board-container {
+    min-height: 320px;
+    padding: 5px;
+  }
+  
+  .game-layout {
+    gap: 20px;
   }
 } 
