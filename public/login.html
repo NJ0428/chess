@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>로그인 - 소켓 체스 게임</title>
+  <link rel="stylesheet" href="main.css">
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- 헤더 -->
+  <header id="header" class="header">
+    <div class="container">
+      <div class="logo">
+        <h1><a href="index.html" style="text-decoration: none; color: inherit;"><i class="fas fa-chess-king"></i> 체스 게임</a></h1>
+      </div>
+      <nav class="nav">
+        <ul class="nav-list">
+          <li><a href="index.html" class="nav-link">홈</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- 로그인/회원가입 폼 -->
+  <main class="login-main">
+    <div class="container">
+      <div class="auth-container">
+        <!-- 로그인 폼 -->
+        <div class="auth-form" id="login-form">
+          <div class="section-header">
+            <h2>로그인</h2>
+          </div>
+          <form id="loginForm">
+            <div class="form-group">
+              <label for="login-username"><i class="fas fa-user"></i> 사용자 이름</label>
+              <input type="text" id="login-username" required>
+            </div>
+            <div class="form-group">
+              <label for="login-password"><i class="fas fa-lock"></i> 비밀번호</label>
+              <input type="password" id="login-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-sign-in-alt"></i> 로그인
+            </button>
+          </form>
+          <div class="toggle-form">
+            <p>계정이 없으신가요? <a href="#" id="show-register">회원가입</a></p>
+          </div>
+        </div>
+
+        <!-- 회원가입 폼 -->
+        <div class="auth-form" id="register-form" style="display: none;">
+          <div class="section-header">
+            <h2>회원가입</h2>
+          </div>
+          <form id="registerForm">
+            <div class="form-group">
+              <label for="register-username"><i class="fas fa-user-plus"></i> 사용자 이름</label>
+              <input type="text" id="register-username" required>
+            </div>
+            <div class="form-group">
+              <label for="register-password"><i class="fas fa-lock"></i> 비밀번호</label>
+              <input type="password" id="register-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-user-plus"></i> 회원가입
+            </button>
+          </form>
+          <div class="toggle-form">
+            <p>이미 계정이 있으신가요? <a href="#" id="show-login">로그인</a></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 알림 -->
+  <div id="notification" class="notification"></div>
+
+  <!-- 푸터 -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-text">
+          <p>&copy; 2024 소켓 체스 게임. MIT 라이센스.</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/auth.js"></script>
+</body>
+</html> 

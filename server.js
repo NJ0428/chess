@@ -2,13 +2,115 @@ const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
 const path = require('path');
+const session = require('express-session');
+const SQLiteStore = require('connect-sqlite3')(session);
+const bcrypt = require('bcrypt');
+const db = require('./server/database.js'); // 데이터베이스 설정 가져오기
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
 
-// 정적 파일 제공
+// 미들웨어 설정
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json()); // JSON 요청 본문 파싱
+app.use(express.urlencoded({ extended: true })); // URL-encoded 요청 본문 파싱
+
+// 세션 설정
+app.use(session({
+  store: new SQLiteStore({
+    db: 'database.sqlite',
+    dir: './'
+  }),
+  secret: 'your-secret-key', // 실제 프로덕션에서는 더 복잡한 키를 사용하세요.
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: 1000 * 60 * 60 * 24 // 24시간
+  }
+}));
+
+// API 라우트
+
+// 회원가입
+app.post('/api/register', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ message: '사용자 이름과 비밀번호를 모두 입력해주세요.' });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const sql = 'INSERT INTO users (username, password) VALUES (?, ?)';
+    db.run(sql, [username, hashedPassword], function(err) {
+      if (err) {
+        if (err.code === 'SQLITE_CONSTRAINT') {
+          return res.status(409).json({ message: '이미 존재하는 사용자 이름입니다.' });
+        }
+        return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+      }
+      res.status(201).json({ message: '회원가입이 성공적으로 완료되었습니다.', userId: this.lastID });
+    });
+  } catch (error) {
+    res.status(500).json({ message: '비밀번호 해싱 중 오류가 발생했습니다.' });
+  }
+});
+
+// 로그인
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ message: '사용자 이름과 비밀번호를 모두 입력해주세요.' });
+  }
+
+  const sql = 'SELECT * FROM users WHERE username = ?';
+  db.get(sql, [username], async (err, user) => {
+    if (err) {
+      return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+    }
+    if (!user) {
+      return res.status(401).json({ message: '사용자 이름 또는 비밀번호가 올바르지 않습니다.' });
+    }
+
+    const match = await bcrypt.compare(password, user.password);
+    if (match) {
+      // 세션에 사용자 정보 저장
+      req.session.userId = user.id;
+      req.session.username = user.username;
+      res.status(200).json({ message: '로그인 성공', user: { id: user.id, username: user.username } });
+    } else {
+      res.status(401).json({ message: '사용자 이름 또는 비밀번호가 올바르지 않습니다.' });
+    }
+  });
+});
+
+// 로그아웃
+app.post('/api/logout', (req, res) => {
+  req.session.destroy(err => {
+    if (err) {
+      return res.status(500).json({ message: '로그아웃 실패' });
+    }
+    res.clearCookie('connect.sid'); // 세션 쿠키 삭제
+    res.status(200).json({ message: '로그아웃 성공' });
+  });
+});
+
+// 로그인 상태 확인
+app.get('/api/auth/status', (req, res) => {
+  if (req.session.userId) {
+    res.status(200).json({
+      isLoggedIn: true,
+      user: {
+        id: req.session.userId,
+        username: req.session.username
+      }
+    });
+  } else {
+    res.status(200).json({ isLoggedIn: false });
+  }
+});
+
+let rooms = {};
 
 // 체스 게임 클래스
 class ChessGame {

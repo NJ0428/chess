@@ -99,10 +99,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-
-
-
-
   // 카운터 애니메이션
   function animateCounters() {
     const counters = document.querySelectorAll('.stat-number');
@@ -175,6 +171,64 @@ document.addEventListener('DOMContentLoaded', function() {
       const originalText = heroTitle.textContent;
       // 주석 처리: 타이핑 효과를 원하지 않는 경우
       // typeWriter(heroTitle, originalText, 80);
+    }
+
+    // 로그인 상태 확인 및 UI 업데이트
+    checkLoginStatus();
+  }
+
+  // 로그인 상태 확인 및 UI 업데이트 함수
+  async function checkLoginStatus() {
+    try {
+      const response = await fetch('/api/auth/status');
+      const data = await response.json();
+      updateAuthUI(data);
+    } catch (error) {
+      console.error('로그인 상태 확인 오류:', error);
+      updateAuthUI({ isLoggedIn: false });
+    }
+  }
+
+  // 로그인 상태에 따라 UI 업데이트
+  function updateAuthUI(authData) {
+    const authLinksContainer = document.getElementById('auth-links');
+    const heroButtonsContainer = document.querySelector('.hero-buttons');
+
+    if (authData.isLoggedIn) {
+      // 로그인 상태일 때
+      authLinksContainer.innerHTML = `
+        <span class="username-display">환영합니다, ${authData.user.username}님!</span>
+        <a href="#" id="logout-btn" class="btn btn-outline">로그아웃</a>
+      `;
+      heroButtonsContainer.innerHTML = `
+        <a href="game.html" class="btn btn-primary">
+          <i class="fas fa-play"></i> 게임 시작
+        </a>
+        <a href="#about" class="btn btn-outline">
+          <i class="fas fa-info-circle"></i> 더 알아보기
+        </a>
+      `;
+      
+      // 로그아웃 버튼 이벤트 리스너 추가
+      document.getElementById('logout-btn').addEventListener('click', async (e) => {
+        e.preventDefault();
+        await fetch('/api/logout', { method: 'POST' });
+        window.location.reload();
+      });
+
+    } else {
+      // 로그아웃 상태일 때
+      authLinksContainer.innerHTML = `
+        <a href="login.html" class="btn btn-primary">로그인</a>
+      `;
+      heroButtonsContainer.innerHTML = `
+        <a href="login.html" class="btn btn-primary">
+          <i class="fas fa-sign-in-alt"></i> 로그인하여 게임 시작
+        </a>
+        <a href="#about" class="btn btn-outline">
+          <i class="fas fa-info-circle"></i> 더 알아보기
+        </a>
+      `;
     }
   }
 

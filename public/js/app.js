@@ -794,4 +794,33 @@ function init() {
 }
 
 // 페이지 로드 시 초기화
-document.addEventListener('DOMContentLoaded', init); 
+document.addEventListener('DOMContentLoaded', () => {
+  // ... (기존 변수 선언)
+  const playerNameInput = document.getElementById('playerNameInput');
+  const lobbySection = document.getElementById('lobby');
+
+  // 로그인 상태 확인 및 초기화
+  async function initializeUser() {
+    try {
+      const response = await fetch('/api/auth/status');
+      const authData = await response.json();
+
+      if (authData.isLoggedIn) {
+        playerNameInput.value = authData.user.username;
+        playerNameInput.disabled = true; // 사용자 이름 변경 불가
+        lobbySection.style.display = 'block'; // 로비 표시
+      } else {
+        alert('로그인이 필요합니다.');
+        window.location.href = '/login.html'; // 로그인 페이지로 리디렉션
+      }
+    } catch (error) {
+      console.error('인증 상태 확인 실패:', error);
+      alert('사용자 정보를 가져오는 데 실패했습니다. 다시 로그인해주세요.');
+      window.location.href = '/login.html';
+    }
+  }
+
+  initializeUser();
+
+  // ... (나머지 기존 app.js 코드) ...
+}); 
