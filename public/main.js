@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (authData.isLoggedIn) {
       // 로그인 상태일 때
       authLinksContainer.innerHTML = `
-        <span class="username-display">환영합니다, ${authData.user.username}님!</span>
+        <span class="username-display">환영합니다, ${authData.user.nickname}님!</span>
         <a href="#" id="logout-btn" class="btn btn-outline">로그아웃</a>
       `;
       heroButtonsContainer.innerHTML = `

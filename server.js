@@ -34,15 +34,28 @@ app.use(session({
 
 // 회원가입
 app.post('/api/register', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ message: '사용자 이름과 비밀번호를 모두 입력해주세요.' });
+  const { username, nickname, password } = req.body;
+
+  if (!username || !nickname || !password) {
+    return res.status(400).json({ message: '모든 필드를 입력해주세요.' });
+  }
+
+  // 사용자 이름 유효성 검사 (영어만)
+  const usernameRegex = /^[a-zA-Z]+$/;
+  if (!usernameRegex.test(username)) {
+    return res.status(400).json({ message: '사용자 이름은 영어로만 작성해주세요.' });
+  }
+
+  // 비밀번호 유효성 검사 (8자 이상, 영어, 숫자, 특수문자)
+  const passwordRegex = /^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[!@#$%^&*]).{8,}$/;
+  if (!passwordRegex.test(password)) {
+    return res.status(400).json({ message: '비밀번호는 8자 이상이며, 영어, 숫자, 특수문자를 모두 포함해야 합니다.' });
   }
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    const sql = 'INSERT INTO users (username, password) VALUES (?, ?)';
-    db.run(sql, [username, hashedPassword], function(err) {
+    const sql = 'INSERT INTO users (username, nickname, password) VALUES (?, ?, ?)';
+    db.run(sql, [username, nickname, hashedPassword], function(err) {
       if (err) {
         if (err.code === 'SQLITE_CONSTRAINT') {
           return res.status(409).json({ message: '이미 존재하는 사용자 이름입니다.' });
@@ -77,7 +90,8 @@ app.post('/api/login', (req, res) => {
       // 세션에 사용자 정보 저장
       req.session.userId = user.id;
       req.session.username = user.username;
-      res.status(200).json({ message: '로그인 성공', user: { id: user.id, username: user.username } });
+      req.session.nickname = user.nickname;
+      res.status(200).json({ message: '로그인 성공', user: { id: user.id, username: user.username, nickname: user.nickname } });
     } else {
       res.status(401).json({ message: '사용자 이름 또는 비밀번호가 올바르지 않습니다.' });
     }
@@ -102,7 +116,8 @@ app.get('/api/auth/status', (req, res) => {
       isLoggedIn: true,
       user: {
         id: req.session.userId,
-        username: req.session.username
+        username: req.session.username,
+        nickname: req.session.nickname
       }
     });
   } else {

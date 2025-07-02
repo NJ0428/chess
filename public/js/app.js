@@ -227,7 +227,7 @@ class UIManager {
 // 방 관리 클래스
 class RoomManager {
   static createRoom() {
-    gameState.playerName = elements.playerNameInput.value.trim() || '익명';
+    // gameState.playerName은 initializeUser에서 설정됨
     const roomId = elements.roomIdInput.value.trim();
     
     if (!roomId) {
@@ -239,8 +239,7 @@ class RoomManager {
   }
 
   static joinRoom(roomId) {
-    gameState.playerName = elements.playerNameInput.value.trim() || '익명';
-    
+    // gameState.playerName은 initializeUser에서 설정됨
     if (!roomId) {
       UIManager.showNotification('방 아이디가 없습니다.');
       return;
@@ -629,17 +628,16 @@ class EventManager {
     });
     
     socket.on('gameStart', (data) => {
+      console.log('게임 시작:', data);
       UIManager.showScreen('gameBoard');
-      
-      // 턴 정보를 먼저 업데이트
+      gameState.gameBoard = data.board;
       gameState.currentTurn = data.turn;
-      gameState.myTurn = gameState.playerColor === data.turn;
-      
-      // 보드 렌더링 (이때 올바른 턴 정보로 UI 업데이트됨)
       BoardRenderer.render(data.board);
+      UIManager.updateGameInfo();
+      UIManager.updateBackgroundColor();
       
-      elements.whitePlayerInfo.textContent = `백: ${data.whitePlayer}`;
-      elements.blackPlayerInfo.textContent = `흑: ${data.blackPlayer}`;
+      elements.whitePlayerInfo.querySelector('span').textContent = `백: ${data.whitePlayer}`;
+      elements.blackPlayerInfo.querySelector('span').textContent = `흑: ${data.blackPlayer}`;
       
       if (gameState.myTurn) {
         UIManager.showNotification('게임이 시작되었습니다. 당신의 턴입니다.');
@@ -786,41 +784,38 @@ function testAllAudio() {
 
 // 초기화
 function init() {
-  EventManager.init();
-  RoomManager.getRoomList();
+  console.log('게임 초기화 시작');
   
-  // 3초 후 오디오 테스트
-  setTimeout(testAllAudio, 3000);
-}
-
-// 페이지 로드 시 초기화
-document.addEventListener('DOMContentLoaded', () => {
-  // ... (기존 변수 선언)
-  const playerNameInput = document.getElementById('playerNameInput');
-  const lobbySection = document.getElementById('lobby');
-
-  // 로그인 상태 확인 및 초기화
-  async function initializeUser() {
-    try {
-      const response = await fetch('/api/auth/status');
-      const authData = await response.json();
-
-      if (authData.isLoggedIn) {
-        playerNameInput.value = authData.user.username;
-        playerNameInput.disabled = true; // 사용자 이름 변경 불가
-        lobbySection.style.display = 'block'; // 로비 표시
-      } else {
-        alert('로그인이 필요합니다.');
-        window.location.href = '/login.html'; // 로그인 페이지로 리디렉션
-      }
-    } catch (error) {
-      console.error('인증 상태 확인 실패:', error);
-      alert('사용자 정보를 가져오는 데 실패했습니다. 다시 로그인해주세요.');
-      window.location.href = '/login.html';
-    }
-  }
-
   initializeUser();
 
-  // ... (나머지 기존 app.js 코드) ...
-}); 
+  const audioManager = new AudioManager();
+  
+  EventManager.init();
+
+  // 모든 오디오 테스트
+  // testAllAudio();
+}
+
+// 사용자 정보 초기화
+async function initializeUser() {
+  try {
+    const response = await fetch('/api/auth/status');
+    const authData = await response.json();
+
+    if (authData.isLoggedIn) {
+      gameState.playerName = authData.user.nickname;
+      elements.playerNameInput.value = authData.user.nickname;
+      elements.playerNameInput.readOnly = true;
+    } else {
+      alert('로그인이 필요합니다.');
+      window.location.href = '/login.html';
+    }
+  } catch (error) {
+    console.error('사용자 정보 로드 실패:', error);
+    alert('사용자 정보를 가져오는 데 실패했습니다. 다시 로그인해주세요.');
+    window.location.href = '/login.html';
+  }
+}
+
+// DOM 로드가 완료되면 초기화 함수 실행
+document.addEventListener('DOMContentLoaded', init); 

@@ -49,13 +49,34 @@ document.addEventListener('DOMContentLoaded', () => {
   registerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = document.getElementById('register-username').value;
+    const nickname = document.getElementById('register-nickname').value;
     const password = document.getElementById('register-password').value;
+    const passwordConfirm = document.getElementById('register-password-confirm').value;
+
+    // 사용자 이름 유효성 검사 (영어만)
+    const usernameRegex = /^[a-zA-Z]+$/;
+    if (!usernameRegex.test(username)) {
+      alert('사용자 이름은 영어로만 작성해주세요.');
+      return;
+    }
+
+    // 비밀번호 유효성 검사 (8자 이상, 영어, 숫자, 특수문자 포함)
+    const passwordRegex = /^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[!@#$%^&*]).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      alert('비밀번호는 8자 이상이며, 영어, 숫자, 특수문자를 모두 포함해야 합니다.');
+      return;
+    }
+
+    if (password !== passwordConfirm) {
+      alert('비밀번호가 일치하지 않습니다.');
+      return;
+    }
 
     try {
       const response = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, nickname, password }),
       });
 
       const result = await response.json();
