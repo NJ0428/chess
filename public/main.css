@@ -917,8 +917,10 @@ section {
   padding: 10px 15px;
   margin: 8px 0;
   border-radius: 8px;
-  background: var(--bg-white);
+  background: var(--secondary-bg);
+  color: var(--text-color);
   border: 1px solid var(--border-color);
+  transition: all 0.3s ease;
 }
 
 .players-list {

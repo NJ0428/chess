@@ -190,15 +190,23 @@ class UIManager {
 
   static updateGameInfo() {
     if (elements.playerColorEl) {
-      elements.playerColorEl.textContent = `내 색상: ${gameState.playerColor === 'white' ? '백' : '흑'}`;
+      const playerColorText = gameState.playerColor 
+        ? (gameState.playerColor === 'white' ? '백' : '흑')
+        : '대기 중';
+      elements.playerColorEl.textContent = `내 색상: ${playerColorText}`;
     }
     if (elements.currentTurnEl) {
-      elements.currentTurnEl.textContent = `현재 턴: ${gameState.currentTurn === 'white' ? '백' : '흑'}`;
+      const currentTurnText = gameState.currentTurn 
+        ? (gameState.currentTurn === 'white' ? '백' : '흑')
+        : '대기 중';
+      elements.currentTurnEl.textContent = `현재 턴: ${currentTurnText}`;
     }
   }
 
   static updateBackgroundColor() {
-    document.body.className = gameState.currentTurn === 'black' ? 'black-turn' : 'white-turn';
+    const newClass = gameState.currentTurn === 'black' ? 'black-turn' : 'white-turn';
+    console.log('배경색 변경:', gameState.currentTurn, '->', newClass);
+    document.body.className = newClass;
   }
 
   static displayRoomList(rooms) {
@@ -343,11 +351,18 @@ class BoardRenderer {
 // 게임 로직 클래스
 class GameLogic {
   static handleSquareClick(event) {
-    if (!gameState.myTurn) return;
+    console.log('클릭 이벤트 발생! myTurn:', gameState.myTurn, 'playerColor:', gameState.playerColor, 'currentTurn:', gameState.currentTurn);
+    
+    if (!gameState.myTurn) {
+      console.log('내 턴이 아니므로 클릭 무시됨');
+      return;
+    }
     
     const square = event.currentTarget;
     const row = parseInt(square.dataset.row);
     const col = parseInt(square.dataset.col);
+    
+    console.log('클릭한 위치:', { row, col });
     
     if (gameState.selectedSquare) {
       GameLogic.handleMoveAttempt(row, col);
@@ -632,6 +647,7 @@ class EventManager {
       UIManager.showScreen('gameBoard');
       gameState.gameBoard = data.board;
       gameState.currentTurn = data.turn;
+      gameState.myTurn = gameState.playerColor === data.turn;
       BoardRenderer.render(data.board);
       UIManager.updateGameInfo();
       UIManager.updateBackgroundColor();
@@ -782,6 +798,19 @@ function testAllAudio() {
   console.log('=== 오디오 테스트 종료 ===');
 }
 
+// 게임 상태 디버깅 함수
+function debugGameState() {
+  console.log('=== 게임 상태 디버깅 ===');
+  console.log('플레이어 색상:', gameState.playerColor);
+  console.log('현재 턴:', gameState.currentTurn);
+  console.log('내 턴인가?:', gameState.myTurn);
+  console.log('현재 방:', gameState.currentRoom);
+  console.log('선택된 말:', gameState.selectedSquare);
+  console.log('게임 보드 존재?:', !!gameState.gameBoard);
+  console.log('Socket 연결됨?:', socket.connected);
+  console.log('=====================');
+}
+
 // 초기화
 function init() {
   console.log('게임 초기화 시작');
@@ -791,6 +820,9 @@ function init() {
   const audioManager = new AudioManager();
   
   EventManager.init();
+
+  // 초기 UI 업데이트
+  UIManager.updateGameInfo();
 
   // 모든 오디오 테스트
   // testAllAudio();
