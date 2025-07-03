@@ -145,6 +145,7 @@ class ChessGame {
       socket.on('movePiece', (data) => this.handleMovePiece(socket, data));
       socket.on('restartGame', (roomId) => this.handleRestartGame(socket, roomId));
       socket.on('leaveRoom', (roomId) => this.handleLeaveRoom(socket, roomId));
+      socket.on('sendChatMessage', (data) => this.handleChatMessage(socket, data));
       socket.on('disconnect', () => this.handleDisconnect(socket));
     });
   }
@@ -179,7 +180,7 @@ class ChessGame {
     socket.join(roomId);
     this.games[roomId] = this.createNewRoom(socket.id, playerName);
     
-    socket.emit('roomCreated', { roomId, color: 'white' });
+    socket.emit('roomCreated', { roomId, color: 'white', chatHistory: [] });
     console.log(`방 생성: ${roomId}`);
     
     io.emit('roomListUpdated');
@@ -211,7 +212,8 @@ class ChessGame {
       roomId, 
       color: 'black', 
       board: room.board,
-      opponentName: room.playerNames.white 
+      opponentName: room.playerNames.white,
+      chatHistory: room.chatHistory || []
     });
     
     io.to(room.players.white).emit('opponentJoined', {
@@ -319,6 +321,61 @@ class ChessGame {
     }
   }
 
+  // 채팅 메시지 처리
+  handleChatMessage(socket, data) {
+    const { roomId, message, playerName } = data;
+    const room = this.games[roomId];
+    
+    if (!room) {
+      socket.emit('error', '존재하지 않는 방입니다.');
+      return;
+    }
+
+    // 메시지 검증
+    if (!message || message.trim().length === 0) {
+      socket.emit('error', '메시지를 입력해주세요.');
+      return;
+    }
+
+    if (message.length > 200) {
+      socket.emit('error', '메시지가 너무 깁니다. (최대 200자)');
+      return;
+    }
+
+    // 플레이어가 해당 방에 참여 중인지 확인
+    const isWhitePlayer = room.players.white === socket.id;
+    const isBlackPlayer = room.players.black === socket.id;
+    
+    if (!isWhitePlayer && !isBlackPlayer) {
+      socket.emit('error', '이 방에 참여하지 않은 사용자입니다.');
+      return;
+    }
+
+    // 채팅 메시지 정보 생성
+    const chatMessage = {
+      id: Date.now(),
+      message: message.trim(),
+      playerName: playerName || '익명',
+      playerColor: isWhitePlayer ? 'white' : 'black',
+      timestamp: new Date().toISOString(),
+      socketId: socket.id
+    };
+
+    // 채팅 히스토리에 저장
+    if (!room.chatHistory) room.chatHistory = [];
+    room.chatHistory.push(chatMessage);
+    
+    // 채팅 히스토리 개수 제한 (최대 100개)
+    if (room.chatHistory.length > 100) {
+      room.chatHistory.shift();
+    }
+
+    // 같은 방의 모든 플레이어에게 채팅 메시지 전송
+    io.to(roomId).emit('chatMessage', chatMessage);
+    
+    console.log(`[채팅] ${roomId} - ${playerName}: ${message}`);
+  }
+
   // 새 방 생성
   createNewRoom(socketId, playerName) {
     return {
@@ -330,6 +387,7 @@ class ChessGame {
       creatorName: playerName || '익명',
       createdAt: new Date().toISOString(),
       moveHistory: [],
+      chatHistory: [], // 채팅 히스토리 추가
       castlingRights: { 
         white: { kingSide: true, queenSide: true }, 
         black: { kingSide: true, queenSide: true } 

@@ -85,6 +85,11 @@ const elements = {
   leaveGameBtn: document.getElementById('leaveGameBtn'),
   notificationEl: document.getElementById('notification'),
 
+  // 채팅
+  chatMessages: document.getElementById('chatMessages'),
+  chatInput: document.getElementById('chatInput'),
+  sendChatBtn: document.getElementById('sendChatBtn'),
+
   // 체스 규칙
   showRulesBtn: document.getElementById('showRulesBtn'),
   chessRulesPanel: document.getElementById('chessRulesPanel'),
@@ -273,6 +278,7 @@ class RoomManager {
     });
     
     UIManager.showScreen('lobby');
+    ChatManager.clearChat();
     this.getRoomList();
   }
 
@@ -595,6 +601,80 @@ class GameLogic {
   }
 }
 
+// 채팅 관리 클래스
+class ChatManager {
+  static init() {
+    elements.sendChatBtn.addEventListener('click', this.sendMessage);
+    elements.chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') this.sendMessage();
+    });
+  }
+
+  static sendMessage() {
+    const message = elements.chatInput.value.trim();
+    if (!message || !gameState.currentRoom) return;
+
+    socket.emit('sendChatMessage', {
+      roomId: gameState.currentRoom,
+      message: message,
+      playerName: gameState.playerName
+    });
+
+    elements.chatInput.value = '';
+  }
+
+  static addMessage(messageData) {
+    const messageElement = document.createElement('div');
+    messageElement.className = 'chat-message';
+    
+    // 자신의 메시지인지 확인
+    const isOwnMessage = messageData.playerColor === gameState.playerColor;
+    messageElement.classList.add(isOwnMessage ? 'own' : 'opponent');
+
+    // 시간 포맷팅
+    const timestamp = new Date(messageData.timestamp);
+    const timeString = timestamp.toLocaleTimeString('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    messageElement.innerHTML = `
+      <div class="message-header">${messageData.playerName}</div>
+      <div class="message-text">${this.escapeHtml(messageData.message)}</div>
+      <div class="message-time">${timeString}</div>
+    `;
+
+    elements.chatMessages.appendChild(messageElement);
+    this.scrollToBottom();
+  }
+
+  static loadChatHistory(chatHistory) {
+    elements.chatMessages.innerHTML = '';
+    if (!chatHistory || chatHistory.length === 0) {
+      elements.chatMessages.innerHTML = '<div class="no-messages">아직 채팅 메시지가 없습니다.</div>';
+      return;
+    }
+
+    chatHistory.forEach(message => {
+      this.addMessage(message);
+    });
+  }
+
+  static clearChat() {
+    elements.chatMessages.innerHTML = '<div class="no-messages">아직 채팅 메시지가 없습니다.</div>';
+  }
+
+  static scrollToBottom() {
+    elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+  }
+
+  static escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+}
+
 // 이벤트 핸들러 설정
 class EventManager {
   static init() {
@@ -613,6 +693,9 @@ class EventManager {
       elements.closeRulesBtn.addEventListener('click', EventManager.closeRulesPanel);
     }
 
+    // 채팅 이벤트 초기화
+    ChatManager.init();
+    
     // 소켓 이벤트
     EventManager.setupSocketEvents();
   }
@@ -629,6 +712,13 @@ class EventManager {
       gameState.playerColor = data.color;
       UIManager.showScreen('gameSetup');
       elements.roomInfo.textContent = `방 아이디: ${data.roomId}`;
+      
+      // 채팅 히스토리 로드
+      if (data.chatHistory) {
+        ChatManager.loadChatHistory(data.chatHistory);
+      } else {
+        ChatManager.clearChat();
+      }
     });
     
     socket.on('roomJoined', (data) => {
@@ -636,6 +726,13 @@ class EventManager {
       gameState.playerColor = data.color;
       UIManager.showScreen('gameSetup');
       elements.roomInfo.textContent = `방 아이디: ${data.roomId}`;
+      
+      // 채팅 히스토리 로드
+      if (data.chatHistory) {
+        ChatManager.loadChatHistory(data.chatHistory);
+      } else {
+        ChatManager.clearChat();
+      }
     });
     
     socket.on('opponentJoined', (data) => {
@@ -773,6 +870,11 @@ class EventManager {
     
     socket.on('error', (message) => {
       UIManager.showNotification(message);
+    });
+    
+    // 채팅 메시지 수신
+    socket.on('chatMessage', (messageData) => {
+      ChatManager.addMessage(messageData);
     });
   }
 
