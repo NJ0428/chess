@@ -8,17 +8,29 @@
 /* CSS 변수 */
 :root {
   --primary-color: #3b82f6;
+  --primary-dark: #1d4ed8;
+  --primary-light: #60a5fa;
   --secondary-color: #1f2937;
   --accent-color: #10b981;
+  --accent-dark: #059669;
   --danger-color: #ef4444;
+  --warning-color: #f59e0b;
+  --success-color: #10b981;
   --text-color: #374151;
   --text-light: #6b7280;
+  --text-lighter: #9ca3af;
   --bg-light: #f8fafc;
   --bg-white: #ffffff;
+  --bg-dark: #111827;
   --border-color: #e5e7eb;
+  --border-light: #f3f4f6;
   --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
   --transition: all 0.3s ease;
+  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --gradient-accent: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
 }
 
 /* 기본 글꼴 설정 */
@@ -187,35 +199,65 @@ section {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 30px;
+  padding: 15px 30px;
   border-radius: 50px;
   text-decoration: none;
   font-weight: 600;
-  transition: var(--transition);
+  transition: all 0.3s ease;
   border: 2px solid transparent;
+  font-size: 1rem;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.btn:hover::before {
+  left: 100%;
 }
 
 .btn-primary {
-  background: var(--primary-color);
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
   color: white;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
 }
 
 .btn-primary:hover {
-  background: #2563eb;
   transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+  background: linear-gradient(135deg, var(--primary-dark), #1e40af);
 }
 
 .btn-outline {
   background: transparent;
   color: var(--primary-color);
   border-color: var(--primary-color);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.1);
 }
 
 .btn-outline:hover {
   background: var(--primary-color);
   color: white;
   transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
+}
+
+.btn i {
+  transition: transform 0.3s ease;
+}
+
+.btn:hover i {
+  transform: scale(1.1);
 }
 
 .hero-image {
@@ -704,34 +746,106 @@ section {
 
 /* 로비 섹션 */
 .lobby-section {
-  background: var(--bg-white);
-  border-radius: 20px;
-  box-shadow: var(--shadow-lg);
+  background: var(--gradient-primary);
+  border-radius: 25px;
+  box-shadow: var(--shadow-xl);
   margin-bottom: 40px;
-  padding: 50px 40px;
+  padding: 60px 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+.lobby-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+  pointer-events: none;
+}
+
+.lobby-section .section-header {
+  position: relative;
+  z-index: 2;
+}
+
+.lobby-section .section-header h2 {
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.lobby-section .section-header p {
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .lobby-content {
   display: grid;
   grid-template-columns: 1fr 2fr;
-  gap: 30px;
-  margin-top: 30px;
+  gap: 40px;
+  margin-top: 40px;
+  position: relative;
+  z-index: 2;
 }
 
 .user-form-card {
-  background: var(--bg-white);
-  padding: 30px;
-  border-radius: 15px;
-  box-shadow: var(--shadow);
-  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 35px;
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.user-form-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
 }
 
 .user-form-card h3 {
   color: var(--secondary-color);
-  margin-bottom: 20px;
+  margin-bottom: 25px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  font-size: 1.3rem;
+}
+
+.user-form-card h3 i {
+  color: var(--primary-color);
+  font-size: 1.4rem;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--secondary-color);
+  font-size: 0.95rem;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 15px 20px;
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  background: white;
 }
 
 .room-actions {
@@ -742,60 +856,133 @@ section {
 
 .room-create-card,
 .room-list-card {
-  background: var(--bg-white);
-  padding: 30px;
-  border-radius: 15px;
-  box-shadow: var(--shadow);
-  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 35px;
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.room-create-card:hover,
+.room-list-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
 }
 
 .room-create-card h3,
 .room-list-card h3 {
   color: var(--secondary-color);
-  margin-bottom: 20px;
+  margin-bottom: 25px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  font-size: 1.3rem;
+}
+
+.room-create-card h3 i,
+.room-list-card h3 i {
+  color: var(--primary-color);
+  font-size: 1.4rem;
 }
 
 .room-list-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 25px;
 }
 
 .room-list-header h3 {
   margin-bottom: 0;
 }
 
+#refreshRoomListBtn {
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 25px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+#refreshRoomListBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+.room-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.room-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.room-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+.room-list::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.5);
+  border-radius: 3px;
+}
+
+.room-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.7);
+}
+
 .no-rooms-message {
   text-align: center;
-  padding: 40px 20px;
+  padding: 50px 20px;
   color: var(--text-light);
 }
 
 .no-rooms-message i {
-  font-size: 3rem;
-  margin-bottom: 15px;
-  color: var(--text-light);
+  font-size: 3.5rem;
+  margin-bottom: 20px;
+  color: var(--primary-color);
+  opacity: 0.6;
 }
 
 .no-rooms-message p {
   margin: 0;
+  font-size: 1.1rem;
+  font-weight: 500;
 }
 
 /* 대기 섹션 */
 .waiting-section {
-  background: var(--bg-white);
-  border-radius: 20px;
-  box-shadow: var(--shadow-lg);
+  background: var(--gradient-primary);
+  border-radius: 25px;
+  box-shadow: var(--shadow-xl);
   margin-bottom: 40px;
-  padding: 60px 40px;
+  padding: 80px 40px;
   min-height: 500px;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.waiting-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+  pointer-events: none;
 }
 
 .waiting-content {
@@ -803,47 +990,88 @@ section {
   display: flex;
   justify-content: center;
   align-items: center;
+  position: relative;
+  z-index: 2;
 }
 
 .waiting-card {
-  background: var(--bg-light);
-  padding: 50px 40px;
-  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 60px 50px;
+  border-radius: 25px;
   text-align: center;
-  box-shadow: var(--shadow);
-  max-width: 500px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  max-width: 550px;
   width: 100%;
+  transition: all 0.3s ease;
+}
+
+.waiting-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
 }
 
 .waiting-icon {
-  font-size: 4rem;
+  font-size: 4.5rem;
   color: var(--primary-color);
-  margin-bottom: 30px;
+  margin-bottom: 35px;
   animation: pulse 2s infinite;
 }
 
 @keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
+  0% { 
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% { 
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+  100% { 
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .room-info {
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   color: var(--secondary-color);
-  margin-bottom: 20px;
+  margin-bottom: 25px;
   font-weight: 600;
+  padding: 15px 25px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 15px;
+  border: 2px solid rgba(59, 130, 246, 0.2);
 }
 
 .waiting-message {
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   color: var(--text-light);
-  margin-bottom: 40px;
+  margin-bottom: 45px;
+  font-weight: 500;
 }
 
 .waiting-actions {
   display: flex;
   justify-content: center;
+}
+
+#backToLobbyBtn {
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+  color: white;
+  border: none;
+  padding: 15px 30px;
+  border-radius: 25px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+#backToLobbyBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
 }
 
 /* 게임 플레이 섹션 */
@@ -1281,7 +1509,7 @@ section {
   .lobby-content {
     grid-template-columns: 1fr;
     gap: 25px;
-    margin-top: 20px;
+    margin-top: 30px;
   }
   
   .game-layout {
@@ -1312,16 +1540,100 @@ section {
   }
   
   .waiting-card {
-    padding: 40px 25px;
+    padding: 40px 30px;
   }
   
   .waiting-icon {
-    font-size: 3rem;
+    font-size: 3.5rem;
   }
   
   .chess-rules-panel {
-    padding: 25px 20px;
     width: 95%;
+    max-height: 80vh;
+    padding: 20px;
+  }
+
+  /* 대기실 모바일 최적화 */
+  .lobby-section {
+    padding: 40px 20px;
+    margin: 20px 0;
+  }
+
+  .lobby-content {
+    grid-template-columns: 1fr;
+    gap: 25px;
+    margin-top: 30px;
+  }
+
+  .user-form-card,
+  .room-create-card,
+  .room-list-card {
+    padding: 25px;
+  }
+
+  .waiting-section {
+    padding: 50px 20px;
+  }
+
+  .waiting-card {
+    padding: 30px 20px;
+  }
+
+  .waiting-icon {
+    font-size: 3rem;
+  }
+
+  .room-list-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+  }
+
+  #refreshRoomListBtn {
+    align-self: flex-end;
+  }
+
+  .game-layout {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .game-sidebar {
+    order: 2;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+
+  .game-info-card,
+  .players-info-card,
+  .legend-card,
+  .game-controls-card {
+    flex: 1;
+    min-width: 250px;
+  }
+
+  .board-container {
+    order: 1;
+  }
+
+  .chess-board {
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .waiting-card {
+    padding: 30px 20px;
+  }
+
+  .waiting-icon {
+    font-size: 3rem;
+  }
+
+  .chess-rules-panel {
+    width: 95%;
+    max-height: 80vh;
+    padding: 20px;
   }
 }
 
@@ -1344,42 +1656,64 @@ section {
   .user-form-card,
   .room-create-card,
   .room-list-card {
-    padding: 20px 15px;
+    padding: 20px;
+    border-radius: 15px;
   }
   
   .game-info-card,
   .players-info-card,
   .legend-card,
-  .game-controls-card,
-  .chat-card {
+  .game-controls-card {
+    min-width: 100%;
     padding: 15px;
   }
   
   .waiting-card {
-    padding: 30px 20px;
+    padding: 25px 15px;
+    border-radius: 20px;
   }
   
   .room-list-header {
-    flex-direction: column;
-    gap: 15px;
-    align-items: stretch;
+    margin-bottom: 20px;
   }
   
   .room-list-header h3 {
-    text-align: center;
+    font-size: 1.1rem;
   }
   
   .chess-board {
-    max-width: 100% !important;
+    max-width: 350px;
   }
   
   .board-container {
-    min-height: 320px;
-    padding: 5px;
+    margin: 15px 0;
   }
   
   .game-layout {
-    gap: 20px;
+    gap: 15px;
+  }
+  
+  .btn {
+    padding: 12px 25px;
+    font-size: 0.9rem;
+  }
+
+  .room-item {
+    padding: 15px;
+    margin: 8px;
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+
+  .room-id {
+    font-size: 1rem;
+  }
+
+  .join-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 20px;
   }
 }
 
@@ -1450,4 +1784,129 @@ section {
 
 .toggle-form a:hover {
   text-decoration: underline;
+} 
+
+/* 대기실 애니메이션 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.lobby-section {
+  animation: fadeInUp 0.8s ease-out;
+}
+
+.user-form-card {
+  animation: slideInLeft 0.8s ease-out 0.2s both;
+}
+
+.room-create-card {
+  animation: slideInRight 0.8s ease-out 0.4s both;
+}
+
+.room-list-card {
+  animation: slideInRight 0.8s ease-out 0.6s both;
+}
+
+.waiting-card {
+  animation: scaleIn 0.8s ease-out;
+}
+
+.room-item {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+/* 호버 효과 개선 */
+.user-form-card:hover,
+.room-create-card:hover,
+.room-list-card:hover {
+  transform: translateY(-5px) scale(1.02);
+}
+
+.room-item:hover {
+  transform: translateY(-3px) scale(1.02);
+}
+
+/* 포커스 효과 */
+.form-group input:focus {
+  transform: scale(1.02);
+}
+
+/* 로딩 애니메이션 */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.loading {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* 부드러운 스크롤 */
+html {
+  scroll-behavior: smooth;
+}
+
+/* 스크롤바 스타일링 */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, var(--primary-color), #1d4ed8);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
 } 
