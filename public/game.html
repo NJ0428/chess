@@ -20,6 +20,7 @@
         <ul class="nav-list">
           <li><a href="index.html" class="nav-link">홈</a></li>
           <li><a href="#lobby" class="nav-link">대기실</a></li>
+          <li><a href="#spectate" class="nav-link">관전</a></li>
           <li><a href="#gameBoard" class="nav-link">게임</a></li>
         </ul>
       </nav>
@@ -73,6 +74,104 @@
                   <i class="fas fa-inbox"></i>
                   <p>현재 참가할 수 있는 방이 없습니다.</p>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 관전 화면 -->
+      <section id="spectate" class="game-section spectate-section">
+        <div class="section-header">
+          <h2><i class="fas fa-eye"></i> 게임 관전</h2>
+          <p>진행 중인 게임을 관전하고 다른 관전자들과 채팅하세요</p>
+        </div>
+        
+        <div class="spectate-content">
+          <div class="spectate-form-card">
+            <h3><i class="fas fa-user"></i> 관전자 정보</h3>
+            <div class="form-group">
+              <label for="spectatorNameInput">관전자 이름</label>
+              <input type="text" id="spectatorNameInput" placeholder="관전자 이름을 입력하세요">
+            </div>
+          </div>
+          
+          <div class="spectate-list-card">
+            <div class="spectate-list-header">
+              <h3><i class="fas fa-chess-board"></i> 진행 중인 게임</h3>
+              <button id="refreshSpectateListBtn" class="btn btn-outline">
+                <i class="fas fa-sync-alt"></i> 새로고침
+              </button>
+            </div>
+            
+            <div id="spectateList" class="spectate-list">
+              <div class="no-games-message">
+                <i class="fas fa-chess-board"></i>
+                <p>현재 진행 중인 게임이 없습니다.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 관전 게임 화면 -->
+      <section id="spectateGame" class="game-section spectate-game-section" style="display: none;">
+        <div class="section-header">
+          <h2><i class="fas fa-eye"></i> 게임 관전 중</h2>
+        </div>
+        
+        <div class="game-layout">
+          <!-- 관전자 채팅 사이드바 (왼쪽) -->
+          <div class="chat-sidebar">
+            <div class="chat-card">
+              <h3><i class="fas fa-comments"></i> 관전자 채팅</h3>
+              <div class="chat-container">
+                <div id="spectatorChatMessages" class="chat-messages"></div>
+                <div class="chat-input-container">
+                  <input type="text" id="spectatorChatInput" class="chat-input" placeholder="관전자 채팅을 입력하세요..." maxlength="200">
+                  <button id="sendSpectatorChatBtn" class="btn btn-primary chat-send-btn">
+                    <i class="fas fa-paper-plane"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="board-container">
+            <div id="spectateBoard" class="chess-board"></div>
+          </div>
+          
+          <div class="game-sidebar">
+            <div class="spectate-info-card">
+              <h3><i class="fas fa-info-circle"></i> 게임 정보</h3>
+              <div id="spectateGameInfo" class="spectate-game-info"></div>
+              <div id="spectateCurrentTurn" class="current-turn-info"></div>
+              <div id="spectatorCount" class="spectator-count-info"></div>
+            </div>
+            
+            <div class="spectate-players-info-card">
+              <h3><i class="fas fa-users"></i> 플레이어</h3>
+              <div class="players-list">
+                <div id="spectateWhitePlayerInfo" class="player-info white-player">
+                  <i class="fas fa-circle" style="color: white; border: 1px solid #ccc; border-radius: 50%;"></i>
+                  <span>백: </span>
+                </div>
+                <div id="spectateBlackPlayerInfo" class="player-info black-player">
+                  <i class="fas fa-circle" style="color: #333;"></i>
+                  <span>흑: </span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="spectate-controls-card">
+              <h3><i class="fas fa-gamepad"></i> 관전 제어</h3>
+              <div class="spectate-controls">
+                <button id="leaveSpectateBtn" class="btn btn-outline">
+                  <i class="fas fa-sign-out-alt"></i> 관전 나가기
+                </button>
+                <button id="backToSpectateListBtn" class="btn btn-outline">
+                  <i class="fas fa-list"></i> 목록으로
+                </button>
               </div>
             </div>
           </div>
@@ -237,6 +336,22 @@
       </div>
       <button class="join-btn">
         <i class="fas fa-sign-in-alt"></i> 참가
+      </button>
+    </div>
+  </template>
+
+  <!-- 관전 게임 아이템 템플릿 -->
+  <template id="spectateItemTemplate">
+    <div class="spectate-item">
+      <div class="spectate-info">
+        <h4 class="game-players"></h4>
+        <div class="game-details">
+          <span class="spectator-count"><i class="fas fa-eye"></i> 0명 관전</span>
+          <span class="move-count"><i class="fas fa-chess-pawn"></i> 0수</span>
+        </div>
+      </div>
+      <button class="spectate-btn">
+        <i class="fas fa-eye"></i> 관전
       </button>
     </div>
   </template>

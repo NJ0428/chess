@@ -55,7 +55,7 @@ app.post('/api/register', async (req, res) => {
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
     const sql = 'INSERT INTO users (username, nickname, password) VALUES (?, ?, ?)';
-    db.run(sql, [username, nickname, hashedPassword], function(err) {
+    db.run(sql, [username, nickname, hashedPassword], function (err) {
       if (err) {
         if (err.code === 'SQLITE_CONSTRAINT') {
           return res.status(409).json({ message: '이미 존재하는 사용자 이름입니다.' });
@@ -131,6 +131,7 @@ let rooms = {};
 class ChessGame {
   constructor() {
     this.games = {};
+    this.spectators = {}; // 관전자 정보 저장
     this.setupSocketEvents();
   }
 
@@ -140,12 +141,16 @@ class ChessGame {
       console.log('사용자 연결:', socket.id);
 
       socket.on('getRoomList', () => this.handleGetRoomList(socket));
+      socket.on('getSpectateList', () => this.handleGetSpectateList(socket));
       socket.on('createRoom', (data) => this.handleCreateRoom(socket, data));
       socket.on('joinRoom', (data) => this.handleJoinRoom(socket, data));
+      socket.on('spectateRoom', (data) => this.handleSpectateRoom(socket, data));
       socket.on('movePiece', (data) => this.handleMovePiece(socket, data));
       socket.on('restartGame', (roomId) => this.handleRestartGame(socket, roomId));
       socket.on('leaveRoom', (roomId) => this.handleLeaveRoom(socket, roomId));
+      socket.on('leaveSpectate', (roomId) => this.handleLeaveSpectate(socket, roomId));
       socket.on('sendChatMessage', (data) => this.handleChatMessage(socket, data));
+      socket.on('sendSpectatorMessage', (data) => this.handleSpectatorMessage(socket, data));
       socket.on('disconnect', () => this.handleDisconnect(socket));
     });
   }
@@ -153,7 +158,7 @@ class ChessGame {
   // 방 목록 요청 처리
   handleGetRoomList(socket) {
     const roomList = [];
-    
+
     for (const roomId in this.games) {
       const room = this.games[roomId];
       if (room.status === 'waiting') {
@@ -164,25 +169,55 @@ class ChessGame {
         });
       }
     }
-    
+
     socket.emit('roomList', roomList);
+  }
+
+  // 관전 가능한 게임 목록 요청 처리
+  handleGetSpectateList(socket) {
+    const spectateList = [];
+
+    for (const roomId in this.games) {
+      const room = this.games[roomId];
+      if (room.status === 'playing') {
+        const spectatorCount = this.spectators[roomId] ? Object.keys(this.spectators[roomId]).length : 0;
+        spectateList.push({
+          id: roomId,
+          whitePlayer: room.playerNames.white || '익명',
+          blackPlayer: room.playerNames.black || '익명',
+          spectatorCount: spectatorCount,
+          moveCount: room.moveHistory ? room.moveHistory.length : 0,
+          createdAt: room.createdAt
+        });
+      }
+    }
+
+    // 인기순으로 정렬 (관전자 수 -> 이동 수)
+    spectateList.sort((a, b) => {
+      if (b.spectatorCount !== a.spectatorCount) {
+        return b.spectatorCount - a.spectatorCount;
+      }
+      return b.moveCount - a.moveCount;
+    });
+
+    socket.emit('spectateList', spectateList);
   }
 
   // 방 생성 처리
   handleCreateRoom(socket, data) {
     const { roomId, playerName } = data;
-    
+
     if (this.games[roomId]) {
       socket.emit('error', '이미 존재하는 방 아이디입니다.');
       return;
     }
-    
+
     socket.join(roomId);
     this.games[roomId] = this.createNewRoom(socket.id, playerName);
-    
+
     socket.emit('roomCreated', { roomId, color: 'white', chatHistory: [] });
     console.log(`방 생성: ${roomId}`);
-    
+
     io.emit('roomListUpdated');
   }
 
@@ -190,7 +225,7 @@ class ChessGame {
   handleJoinRoom(socket, data) {
     const { roomId, playerName } = data;
     const room = this.games[roomId];
-    
+
     if (!room) {
       socket.emit('error', '존재하지 않는 방입니다.');
       return;
@@ -205,31 +240,98 @@ class ChessGame {
     room.players.black = socket.id;
     room.playerNames.black = playerName || '익명';
     room.status = 'playing';
-    
+
     console.log(`${socket.id}가 ${roomId}에 참가함`);
-    
-    socket.emit('roomJoined', { 
-      roomId, 
-      color: 'black', 
+
+    socket.emit('roomJoined', {
+      roomId,
+      color: 'black',
       board: room.board,
       opponentName: room.playerNames.white,
       chatHistory: room.chatHistory || []
     });
-    
+
     io.to(room.players.white).emit('opponentJoined', {
       opponentName: playerName || '익명'
     });
-    
+
     io.emit('roomListUpdated');
-    
+    io.emit('spectateListUpdated');
+
     setTimeout(() => {
-      io.to(roomId).emit('gameStart', { 
-        board: room.board, 
+      io.to(roomId).emit('gameStart', {
+        board: room.board,
         turn: room.currentTurn,
         whitePlayer: room.playerNames.white,
         blackPlayer: room.playerNames.black
       });
+
+      // 관전자들에게도 게임 시작 알림
+      if (this.spectators[roomId]) {
+        for (const spectatorId in this.spectators[roomId]) {
+          io.to(spectatorId).emit('spectateGameStart', {
+            board: room.board,
+            turn: room.currentTurn,
+            whitePlayer: room.playerNames.white,
+            blackPlayer: room.playerNames.black
+          });
+        }
+      }
     }, 1000);
+  }
+
+  // 관전 처리
+  handleSpectateRoom(socket, data) {
+    const { roomId, spectatorName } = data;
+    const room = this.games[roomId];
+
+    if (!room) {
+      socket.emit('error', '존재하지 않는 방입니다.');
+      return;
+    }
+
+    if (room.status !== 'playing') {
+      socket.emit('error', '진행 중인 게임이 아닙니다.');
+      return;
+    }
+
+    // 이미 플레이어인 경우 관전 불가
+    if (room.players.white === socket.id || room.players.black === socket.id) {
+      socket.emit('error', '플레이어는 관전할 수 없습니다.');
+      return;
+    }
+
+    socket.join(roomId);
+
+    // 관전자 정보 저장
+    if (!this.spectators[roomId]) {
+      this.spectators[roomId] = {};
+    }
+    this.spectators[roomId][socket.id] = {
+      name: spectatorName || '익명',
+      joinedAt: new Date().toISOString()
+    };
+
+    console.log(`${socket.id}가 ${roomId}를 관전 시작`);
+
+    socket.emit('spectateJoined', {
+      roomId,
+      board: room.board,
+      turn: room.currentTurn,
+      whitePlayer: room.playerNames.white,
+      blackPlayer: room.playerNames.black,
+      moveHistory: room.moveHistory || [],
+      spectatorChatHistory: room.spectatorChatHistory || []
+    });
+
+    // 다른 관전자들에게 새 관전자 알림
+    const spectatorCount = Object.keys(this.spectators[roomId]).length;
+    io.to(roomId).emit('spectatorJoined', {
+      spectatorName: spectatorName || '익명',
+      spectatorCount: spectatorCount
+    });
+
+    io.emit('spectateListUpdated');
   }
 
   // 체스말 이동 처리
@@ -243,10 +345,10 @@ class ChessGame {
     }
 
     const moveResult = ChessRules.isValidMove(room.board, from, to, color, room.moveHistory, room.castlingRights);
-    
+
     if (moveResult.valid) {
       const gameResult = this.processMove(room, from, to, moveResult);
-      
+
       if (gameResult.gameEnded) {
         this.endGame(roomId, gameResult);
       } else {
@@ -266,15 +368,33 @@ class ChessGame {
     room.currentTurn = 'white';
     room.status = 'playing';
     room.moveHistory = [];
-    room.castlingRights = { 
-      white: { kingSide: true, queenSide: true }, 
-      black: { kingSide: true, queenSide: true } 
+    room.castlingRights = {
+      white: { kingSide: true, queenSide: true },
+      black: { kingSide: true, queenSide: true }
     };
 
-    io.to(roomId).emit('gameRestarted', {
+    // 플레이어들에게 게임 재시작 알림
+    io.to(room.players.white).emit('gameRestarted', {
       board: room.board,
       turn: room.currentTurn
     });
+
+    if (room.players.black) {
+      io.to(room.players.black).emit('gameRestarted', {
+        board: room.board,
+        turn: room.currentTurn
+      });
+    }
+
+    // 관전자들에게도 게임 재시작 알림
+    if (this.spectators[roomId]) {
+      for (const spectatorId in this.spectators[roomId]) {
+        io.to(spectatorId).emit('spectatorBoardUpdate', {
+          board: room.board,
+          turn: room.currentTurn
+        });
+      }
+    }
   }
 
   // 방 나가기 처리
@@ -287,31 +407,62 @@ class ChessGame {
 
     if (isWhitePlayer || isBlackPlayer) {
       socket.leave(roomId);
-      
+
       if (isWhitePlayer && room.players.black) {
         room.players.white = room.players.black;
         room.playerNames.white = room.playerNames.black;
         room.players.black = null;
         room.playerNames.black = null;
         room.status = 'waiting';
-        
+
         io.to(room.players.white).emit('becomeHost', {
           color: 'white',
           message: '상대방이 나가서 방장이 되었습니다.'
         });
       } else {
+        // 관전자들에게 게임 종료 알림
+        if (this.spectators[roomId]) {
+          for (const spectatorId in this.spectators[roomId]) {
+            io.to(spectatorId).emit('gameEnded', { reason: '플레이어가 나갔습니다.' });
+          }
+          delete this.spectators[roomId];
+        }
+
         delete this.games[roomId];
         io.to(roomId).emit('playerLeft');
       }
-      
+
       io.emit('roomListUpdated');
+      io.emit('spectateListUpdated');
     }
+  }
+
+  // 관전 나가기 처리
+  handleLeaveSpectate(socket, roomId) {
+    if (!roomId || !this.spectators[roomId] || !this.spectators[roomId][socket.id]) return;
+
+    socket.leave(roomId);
+    delete this.spectators[roomId][socket.id];
+
+    // 관전자가 모두 나간 경우 관전자 목록 삭제
+    if (Object.keys(this.spectators[roomId]).length === 0) {
+      delete this.spectators[roomId];
+    }
+
+    console.log(`${socket.id}가 ${roomId} 관전 종료`);
+
+    // 남은 관전자 수 업데이트
+    const spectatorCount = this.spectators[roomId] ? Object.keys(this.spectators[roomId]).length : 0;
+    io.to(roomId).emit('spectatorLeft', { spectatorCount });
+
+    io.emit('spectateListUpdated');
   }
 
   // 연결 해제 처리
   handleDisconnect(socket) {
     console.log('사용자 연결 해제:', socket.id);
-    
+
+    // 플레이어로 참여한 방 확인
     for (const roomId in this.games) {
       const room = this.games[roomId];
       if (room.players.white === socket.id || room.players.black === socket.id) {
@@ -319,13 +470,21 @@ class ChessGame {
         break;
       }
     }
+
+    // 관전자로 참여한 방 확인
+    for (const roomId in this.spectators) {
+      if (this.spectators[roomId][socket.id]) {
+        this.handleLeaveSpectate(socket, roomId);
+        break;
+      }
+    }
   }
 
-  // 채팅 메시지 처리
+  // 채팅 메시지 처리 (플레이어용)
   handleChatMessage(socket, data) {
     const { roomId, message, playerName } = data;
     const room = this.games[roomId];
-    
+
     if (!room) {
       socket.emit('error', '존재하지 않는 방입니다.');
       return;
@@ -345,7 +504,7 @@ class ChessGame {
     // 플레이어가 해당 방에 참여 중인지 확인
     const isWhitePlayer = room.players.white === socket.id;
     const isBlackPlayer = room.players.black === socket.id;
-    
+
     if (!isWhitePlayer && !isBlackPlayer) {
       socket.emit('error', '이 방에 참여하지 않은 사용자입니다.');
       return;
@@ -358,22 +517,82 @@ class ChessGame {
       playerName: playerName || '익명',
       playerColor: isWhitePlayer ? 'white' : 'black',
       timestamp: new Date().toISOString(),
-      socketId: socket.id
+      socketId: socket.id,
+      type: 'player'
     };
 
     // 채팅 히스토리에 저장
     if (!room.chatHistory) room.chatHistory = [];
     room.chatHistory.push(chatMessage);
-    
+
     // 채팅 히스토리 개수 제한 (최대 100개)
     if (room.chatHistory.length > 100) {
       room.chatHistory.shift();
     }
 
-    // 같은 방의 모든 플레이어에게 채팅 메시지 전송
-    io.to(roomId).emit('chatMessage', chatMessage);
-    
-    console.log(`[채팅] ${roomId} - ${playerName}: ${message}`);
+    // 플레이어들에게만 채팅 메시지 전송
+    io.to(room.players.white).emit('chatMessage', chatMessage);
+    if (room.players.black) {
+      io.to(room.players.black).emit('chatMessage', chatMessage);
+    }
+
+    console.log(`[플레이어 채팅] ${roomId} - ${playerName}: ${message}`);
+  }
+
+  // 관전자 채팅 메시지 처리
+  handleSpectatorMessage(socket, data) {
+    const { roomId, message, spectatorName } = data;
+    const room = this.games[roomId];
+
+    if (!room) {
+      socket.emit('error', '존재하지 않는 방입니다.');
+      return;
+    }
+
+    // 관전자인지 확인
+    if (!this.spectators[roomId] || !this.spectators[roomId][socket.id]) {
+      socket.emit('error', '관전자가 아닙니다.');
+      return;
+    }
+
+    // 메시지 검증
+    if (!message || message.trim().length === 0) {
+      socket.emit('error', '메시지를 입력해주세요.');
+      return;
+    }
+
+    if (message.length > 200) {
+      socket.emit('error', '메시지가 너무 깁니다. (최대 200자)');
+      return;
+    }
+
+    // 관전자 채팅 메시지 정보 생성
+    const spectatorMessage = {
+      id: Date.now(),
+      message: message.trim(),
+      spectatorName: spectatorName || '익명',
+      timestamp: new Date().toISOString(),
+      socketId: socket.id,
+      type: 'spectator'
+    };
+
+    // 관전자 채팅 히스토리에 저장
+    if (!room.spectatorChatHistory) room.spectatorChatHistory = [];
+    room.spectatorChatHistory.push(spectatorMessage);
+
+    // 채팅 히스토리 개수 제한 (최대 100개)
+    if (room.spectatorChatHistory.length > 100) {
+      room.spectatorChatHistory.shift();
+    }
+
+    // 관전자들에게만 채팅 메시지 전송
+    if (this.spectators[roomId]) {
+      for (const spectatorId in this.spectators[roomId]) {
+        io.to(spectatorId).emit('spectatorChatMessage', spectatorMessage);
+      }
+    }
+
+    console.log(`[관전자 채팅] ${roomId} - ${spectatorName}: ${message}`);
   }
 
   // 새 방 생성
@@ -387,10 +606,11 @@ class ChessGame {
       creatorName: playerName || '익명',
       createdAt: new Date().toISOString(),
       moveHistory: [],
-      chatHistory: [], // 채팅 히스토리 추가
-      castlingRights: { 
-        white: { kingSide: true, queenSide: true }, 
-        black: { kingSide: true, queenSide: true } 
+      chatHistory: [], // 플레이어 채팅 히스토리
+      spectatorChatHistory: [], // 관전자 채팅 히스토리
+      castlingRights: {
+        white: { kingSide: true, queenSide: true },
+        black: { kingSide: true, queenSide: true }
       }
     };
   }
@@ -401,7 +621,7 @@ class ChessGame {
     const [toRow, toCol] = to;
     const targetPiece = room.board[toRow][toCol];
     const movingPiece = room.board[fromRow][fromCol];
-    
+
     let gameEnded = false;
     let winner = null;
     let message = '';
@@ -413,7 +633,7 @@ class ChessGame {
     }
 
     const moveDetails = ChessRules.movePiece(room.board, from, to, moveResult);
-    
+
     if (!room.moveHistory) room.moveHistory = [];
     room.moveHistory.push({
       piece: movingPiece.type,
@@ -433,41 +653,102 @@ class ChessGame {
   endGame(roomId, gameResult) {
     const room = this.games[roomId];
     room.status = 'finished';
-    
-    io.to(roomId).emit('boardUpdate', {
+
+    // 플레이어들에게 보드 업데이트
+    io.to(room.players.white).emit('boardUpdate', {
       board: room.board,
       turn: room.currentTurn,
       status: 'checkmate',
       moveDetails: gameResult.moveDetails
     });
-    
-    io.to(roomId).emit('gameOver', { 
+
+    if (room.players.black) {
+      io.to(room.players.black).emit('boardUpdate', {
+        board: room.board,
+        turn: room.currentTurn,
+        status: 'checkmate',
+        moveDetails: gameResult.moveDetails
+      });
+    }
+
+    // 관전자들에게도 보드 업데이트
+    if (this.spectators[roomId]) {
+      for (const spectatorId in this.spectators[roomId]) {
+        io.to(spectatorId).emit('spectatorBoardUpdate', {
+          board: room.board,
+          turn: room.currentTurn,
+          status: 'checkmate',
+          moveDetails: gameResult.moveDetails
+        });
+      }
+    }
+
+    // 게임 종료 알림
+    io.to(room.players.white).emit('gameOver', {
       winner: gameResult.winner,
       message: gameResult.message
     });
+
+    if (room.players.black) {
+      io.to(room.players.black).emit('gameOver', {
+        winner: gameResult.winner,
+        message: gameResult.message
+      });
+    }
+
+    // 관전자들에게 게임 종료 알림
+    if (this.spectators[roomId]) {
+      for (const spectatorId in this.spectators[roomId]) {
+        io.to(spectatorId).emit('gameEnded', {
+          reason: `${gameResult.winner === 'white' ? '백' : '흑'}이 승리했습니다! ${gameResult.message}`
+        });
+      }
+    }
   }
 
   // 턴 계속
   continueTurn(roomId, room) {
     room.currentTurn = room.currentTurn === 'white' ? 'black' : 'white';
-    
-    io.to(roomId).emit('boardUpdate', {
+
+    const moveDetails = {
+      from: room.moveHistory[room.moveHistory.length - 1].from,
+      to: room.moveHistory[room.moveHistory.length - 1].to,
+      piece: room.moveHistory[room.moveHistory.length - 1].piece,
+      capture: room.moveHistory[room.moveHistory.length - 1].capture || false,
+      special: room.moveHistory[room.moveHistory.length - 1].special
+    };
+
+    // 플레이어들에게 보드 업데이트
+    io.to(room.players.white).emit('boardUpdate', {
       board: room.board,
       turn: room.currentTurn,
-      moveDetails: {
-        from: room.moveHistory[room.moveHistory.length - 1].from,
-        to: room.moveHistory[room.moveHistory.length - 1].to,
-        piece: room.moveHistory[room.moveHistory.length - 1].piece,
-        capture: room.moveHistory[room.moveHistory.length - 1].capture || false,
-        special: room.moveHistory[room.moveHistory.length - 1].special
-      }
+      moveDetails: moveDetails
     });
+
+    if (room.players.black) {
+      io.to(room.players.black).emit('boardUpdate', {
+        board: room.board,
+        turn: room.currentTurn,
+        moveDetails: moveDetails
+      });
+    }
+
+    // 관전자들에게도 보드 업데이트
+    if (this.spectators[roomId]) {
+      for (const spectatorId in this.spectators[roomId]) {
+        io.to(spectatorId).emit('spectatorBoardUpdate', {
+          board: room.board,
+          turn: room.currentTurn,
+          moveDetails: moveDetails
+        });
+      }
+    }
   }
 
   // 캐슬링 권한 업데이트
   updateCastlingRights(room, from, piece) {
     const [row, col] = from;
-    
+
     if (piece.type === 'king') {
       if (piece.color === 'white') {
         room.castlingRights.white.kingSide = false;
@@ -493,21 +774,21 @@ class ChessRules {
   // 초기 체스판 설정
   static initializeBoard() {
     const board = Array(8).fill(null).map(() => Array(8).fill(null));
-    
+
     // 검정말 배치
     const blackPieces = ['rook', 'knight', 'bishop', 'queen', 'king', 'bishop', 'knight', 'rook'];
     for (let col = 0; col < 8; col++) {
       board[0][col] = { type: blackPieces[col], color: 'black' };
       board[1][col] = { type: 'pawn', color: 'black' };
     }
-    
+
     // 흰말 배치
     const whitePieces = ['rook', 'knight', 'bishop', 'queen', 'king', 'bishop', 'knight', 'rook'];
     for (let col = 0; col < 8; col++) {
       board[7][col] = { type: whitePieces[col], color: 'white' };
       board[6][col] = { type: 'pawn', color: 'white' };
     }
-    
+
     return board;
   }
 
@@ -515,21 +796,21 @@ class ChessRules {
   static isValidMove(board, from, to, color, moveHistory = [], castlingRights = {}) {
     const [fromRow, fromCol] = from;
     const [toRow, toCol] = to;
-    
+
     if (!this.isValidPosition(fromRow, fromCol) || !this.isValidPosition(toRow, toCol)) {
       return { valid: false };
     }
-    
+
     const piece = board[fromRow][fromCol];
     if (!piece || piece.color !== color) {
       return { valid: false };
     }
-    
+
     const targetPiece = board[toRow][toCol];
     if (targetPiece && targetPiece.color === color) {
       return { valid: false };
     }
-    
+
     return this.validatePieceMove(board, from, to, piece, moveHistory, castlingRights);
   }
 
@@ -559,10 +840,10 @@ class ChessRules {
     const [toRow, toCol] = to;
     const direction = color === 'white' ? -1 : 1;
     const startRow = color === 'white' ? 6 : 1;
-    
+
     const rowDiff = toRow - fromRow;
     const colDiff = Math.abs(toCol - fromCol);
-    
+
     // 전진 이동
     if (colDiff === 0) {
       if (rowDiff === direction && !board[toRow][toCol]) {
@@ -572,19 +853,19 @@ class ChessRules {
         return { valid: true, special: 'double_move' };
       }
     }
-    
+
     // 대각선 공격
     if (colDiff === 1 && rowDiff === direction) {
       if (board[toRow][toCol] && board[toRow][toCol].color !== color) {
         return { valid: true };
       }
-      
+
       // 앙파상
       if (this.canEnPassant(board, from, to, color, moveHistory)) {
         return { valid: true, special: 'en_passant' };
       }
     }
-    
+
     return { valid: false };
   }
 
@@ -592,11 +873,11 @@ class ChessRules {
   static validateRookMove(board, from, to) {
     const [fromRow, fromCol] = from;
     const [toRow, toCol] = to;
-    
+
     if (fromRow !== toRow && fromCol !== toCol) {
       return { valid: false };
     }
-    
+
     return this.isPathClear(board, from, to) ? { valid: true } : { valid: false };
   }
 
@@ -604,11 +885,11 @@ class ChessRules {
   static validateKnightMove(from, to) {
     const [fromRow, fromCol] = from;
     const [toRow, toCol] = to;
-    
+
     const rowDiff = Math.abs(toRow - fromRow);
     const colDiff = Math.abs(toCol - fromCol);
-    
-    return (rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2) ? 
+
+    return (rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2) ?
       { valid: true } : { valid: false };
   }
 
@@ -616,11 +897,11 @@ class ChessRules {
   static validateBishopMove(board, from, to) {
     const [fromRow, fromCol] = from;
     const [toRow, toCol] = to;
-    
+
     if (Math.abs(toRow - fromRow) !== Math.abs(toCol - fromCol)) {
       return { valid: false };
     }
-    
+
     return this.isPathClear(board, from, to) ? { valid: true } : { valid: false };
   }
 
@@ -628,7 +909,7 @@ class ChessRules {
   static validateQueenMove(board, from, to) {
     const rookMove = this.validateRookMove(board, from, to);
     const bishopMove = this.validateBishopMove(board, from, to);
-    
+
     return rookMove.valid || bishopMove.valid ? { valid: true } : { valid: false };
   }
 
@@ -636,20 +917,20 @@ class ChessRules {
   static validateKingMove(board, from, to, castlingRights) {
     const [fromRow, fromCol] = from;
     const [toRow, toCol] = to;
-    
+
     const rowDiff = Math.abs(toRow - fromRow);
     const colDiff = Math.abs(toCol - fromCol);
-    
+
     // 기본 킹 이동 (한 칸)
     if (rowDiff <= 1 && colDiff <= 1) {
       return { valid: true };
     }
-    
+
     // 캐슬링
     if (rowDiff === 0 && colDiff === 2) {
       return this.validateCastling(board, from, to, castlingRights);
     }
-    
+
     return { valid: false };
   }
 
@@ -658,37 +939,37 @@ class ChessRules {
     const [fromRow, fromCol] = from;
     const [toRow, toCol] = to;
     const piece = board[fromRow][fromCol];
-    
+
     if (piece.type !== 'king' || fromRow !== toRow) {
       return { valid: false };
     }
-    
+
     const isKingSide = toCol > fromCol;
     const rights = castlingRights[piece.color];
-    
+
     if (!rights || (isKingSide && !rights.kingSide) || (!isKingSide && !rights.queenSide)) {
       return { valid: false };
     }
-    
+
     // 경로 확인
     const rookCol = isKingSide ? 7 : 0;
     const rook = board[fromRow][rookCol];
-    
+
     if (!rook || rook.type !== 'rook' || rook.color !== piece.color) {
       return { valid: false };
     }
-    
+
     const startCol = Math.min(fromCol, rookCol);
     const endCol = Math.max(fromCol, rookCol);
-    
+
     for (let col = startCol + 1; col < endCol; col++) {
       if (board[fromRow][col]) {
         return { valid: false };
       }
     }
-    
-    return { 
-      valid: true, 
+
+    return {
+      valid: true,
       special: 'castling',
       rookFrom: [fromRow, rookCol],
       rookTo: [fromRow, isKingSide ? 5 : 3]
@@ -698,16 +979,16 @@ class ChessRules {
   // 앙파상 검증
   static canEnPassant(board, from, to, color, moveHistory) {
     if (!moveHistory.length) return false;
-    
+
     const lastMove = moveHistory[moveHistory.length - 1];
     const [fromRow, fromCol] = from;
     const [toRow, toCol] = to;
-    
+
     // 마지막 이동이 폰의 두 칸 이동이어야 함
     if (lastMove.piece !== 'pawn' || !lastMove.special || lastMove.special !== 'double_move') {
       return false;
     }
-    
+
     // 같은 행에 있고, 목표 열이 마지막 이동의 목표 열과 같아야 함
     const expectedRow = color === 'white' ? 3 : 4;
     return fromRow === expectedRow && toCol === lastMove.to[1];
@@ -717,13 +998,13 @@ class ChessRules {
   static isPathClear(board, from, to) {
     const [fromRow, fromCol] = from;
     const [toRow, toCol] = to;
-    
+
     const rowStep = toRow === fromRow ? 0 : (toRow > fromRow ? 1 : -1);
     const colStep = toCol === fromCol ? 0 : (toCol > fromCol ? 1 : -1);
-    
+
     let currentRow = fromRow + rowStep;
     let currentCol = fromCol + colStep;
-    
+
     while (currentRow !== toRow || currentCol !== toCol) {
       if (board[currentRow][currentCol]) {
         return false;
@@ -731,7 +1012,7 @@ class ChessRules {
       currentRow += rowStep;
       currentCol += colStep;
     }
-    
+
     return true;
   }
 
@@ -745,26 +1026,26 @@ class ChessRules {
     const [fromRow, fromCol] = from;
     const [toRow, toCol] = to;
     const piece = board[fromRow][fromCol];
-    
+
     // 기본 이동
     board[toRow][toCol] = piece;
     board[fromRow][fromCol] = null;
-    
+
     let result = { special: moveDetails.special };
-    
+
     // 특수 이동 처리
     if (moveDetails.special === 'castling') {
       const [rookFromRow, rookFromCol] = moveDetails.rookFrom;
       const [rookToRow, rookToCol] = moveDetails.rookTo;
       const rook = board[rookFromRow][rookFromCol];
-      
+
       board[rookToRow][rookToCol] = rook;
       board[rookFromRow][rookFromCol] = null;
     } else if (moveDetails.special === 'en_passant') {
       const capturedPawnRow = piece.color === 'white' ? toRow + 1 : toRow - 1;
       board[capturedPawnRow][toCol] = null;
     }
-    
+
     return result;
   }
 }

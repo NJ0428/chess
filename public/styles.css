@@ -65,12 +65,26 @@ body.black-turn {
 }
 
 /* 타이포그래피 */
-h1 { margin-bottom: 30px; }
-h2 { margin-bottom: 25px; }
-h3 { margin-bottom: 15px; }
-h4 { margin-bottom: 10px; }
+h1 {
+  margin-bottom: 30px;
+}
 
-h1, h2, h3, h4 {
+h2 {
+  margin-bottom: 25px;
+}
+
+h3 {
+  margin-bottom: 15px;
+}
+
+h4 {
+  margin-bottom: 10px;
+}
+
+h1,
+h2,
+h3,
+h4 {
   text-align: center;
   color: inherit;
 }
@@ -436,13 +450,27 @@ body.black-turn .player-info {
 }
 
 @keyframes check-pulse {
-  0%, 100% { background-color: #ff4444; }
-  50% { background-color: #ff8888; }
+
+  0%,
+  100% {
+    background-color: #ff4444;
+  }
+
+  50% {
+    background-color: #ff8888;
+  }
 }
 
 @keyframes winner-glow {
-  0%, 100% { background-color: #ffd700; }
-  50% { background-color: #ffed4e; }
+
+  0%,
+  100% {
+    background-color: #ffd700;
+  }
+
+  50% {
+    background-color: #ffed4e;
+  }
 }
 
 /* 범례 */
@@ -565,8 +593,15 @@ body.black-turn .player-info {
 }
 
 @keyframes check-text-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* 반응형 디자인 */
@@ -574,27 +609,27 @@ body.black-turn .player-info {
   .container {
     padding: 10px;
   }
-  
+
   .chess-board {
     width: min(80vw, 400px);
     height: min(80vw, 400px);
   }
-  
+
   .game-info {
     flex-direction: column;
     text-align: center;
   }
-  
+
   .legend {
     flex-direction: column;
     align-items: center;
   }
-  
+
   .players-info {
     flex-direction: column;
     gap: 10px;
   }
-  
+
   .chess-rules-panel {
     width: 90vw;
     max-width: none;
@@ -607,6 +642,7 @@ body.black-turn .player-info {
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -618,6 +654,7 @@ body.black-turn .player-info {
     opacity: 1;
     transform: translateY(0);
   }
+
   to {
     opacity: 0;
     transform: translateY(-10px);
@@ -630,4 +667,208 @@ body.black-turn .player-info {
 
 .fade-out {
   animation: fadeOut 0.3s ease-in-out;
-} 
+}
+
+/* 관전 
+섹션 스타일 */
+.spectate-section {
+  padding: 2rem 0;
+}
+
+.spectate-content {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.spectate-form-card {
+  background: var(--secondary-bg);
+  padding: 2rem;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  height: fit-content;
+}
+
+.spectate-form-card h3 {
+  margin-bottom: 1.5rem;
+  color: var(--text-color);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spectate-list-card {
+  background: var(--secondary-bg);
+  padding: 2rem;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+}
+
+.spectate-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.spectate-list-header h3 {
+  color: var(--text-color);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spectate-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.spectate-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  margin-bottom: 0.5rem;
+  background: var(--secondary-bg);
+  transition: var(--transition);
+}
+
+.spectate-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.spectate-info h4 {
+  color: var(--text-color);
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.game-details {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.9rem;
+  color: var(--neutral-color);
+}
+
+.game-details span {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.spectate-btn {
+  background: var(--secondary-accent);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spectate-btn:hover {
+  background: #2980b9;
+  transform: translateY(-1px);
+}
+
+.no-games-message {
+  text-align: center;
+  padding: 3rem;
+  color: var(--neutral-color);
+}
+
+.no-games-message i {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+/* 관전 게임 화면 스타일 */
+.spectate-game-section {
+  padding: 2rem 0;
+}
+
+.spectate-info-card,
+.spectate-players-info-card,
+.spectate-controls-card {
+  background: var(--secondary-bg);
+  padding: 1.5rem;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 1rem;
+}
+
+.spectate-info-card h3,
+.spectate-players-info-card h3,
+.spectate-controls-card h3 {
+  margin-bottom: 1rem;
+  color: var(--text-color);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+}
+
+.spectate-game-info,
+.spectator-count-info {
+  margin-bottom: 0.5rem;
+  color: var(--text-color);
+  font-size: 0.9rem;
+}
+
+.spectate-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.spectate-controls .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+/* 관전자 채팅 스타일 */
+.spectator-message {
+  border-left: 3px solid var(--secondary-accent);
+}
+
+.spectator-badge {
+  background: var(--secondary-accent);
+  color: white;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 10px;
+  margin-left: 0.5rem;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .spectate-content {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .spectate-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .spectate-btn {
+    align-self: stretch;
+    justify-content: center;
+  }
+
+  .game-details {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}

@@ -46,6 +46,8 @@ const gameState = {
   myTurn: false,
   currentTurn: 'white',
   playerName: '',
+  isSpectating: false,
+  spectatorName: '',
   audioLoaded: {
     check: false,
     checkmate: false,
@@ -66,6 +68,29 @@ const elements = {
   refreshRoomListBtn: document.getElementById('refreshRoomListBtn'),
   roomList: document.getElementById('roomList'),
   roomItemTemplate: document.getElementById('roomItemTemplate'),
+
+  // 관전
+  spectate: document.getElementById('spectate'),
+  spectatorNameInput: document.getElementById('spectatorNameInput'),
+  refreshSpectateListBtn: document.getElementById('refreshSpectateListBtn'),
+  spectateList: document.getElementById('spectateList'),
+  spectateItemTemplate: document.getElementById('spectateItemTemplate'),
+
+  // 관전 게임
+  spectateGame: document.getElementById('spectateGame'),
+  spectateBoard: document.getElementById('spectateBoard'),
+  spectateGameInfo: document.getElementById('spectateGameInfo'),
+  spectateCurrentTurn: document.getElementById('spectateCurrentTurn'),
+  spectatorCount: document.getElementById('spectatorCount'),
+  spectateWhitePlayerInfo: document.getElementById('spectateWhitePlayerInfo'),
+  spectateBlackPlayerInfo: document.getElementById('spectateBlackPlayerInfo'),
+  leaveSpectateBtn: document.getElementById('leaveSpectateBtn'),
+  backToSpectateListBtn: document.getElementById('backToSpectateListBtn'),
+
+  // 관전자 채팅
+  spectatorChatMessages: document.getElementById('spectatorChatMessages'),
+  spectatorChatInput: document.getElementById('spectatorChatInput'),
+  sendSpectatorChatBtn: document.getElementById('sendSpectatorChatBtn'),
 
   // 대기실
   gameSetup: document.getElementById('gameSetup'),
@@ -174,9 +199,11 @@ class AudioManager {
 // UI 관리 클래스
 class UIManager {
   static showScreen(screenName) {
-    const screens = ['lobby', 'gameSetup', 'gameBoard'];
+    const screens = ['lobby', 'spectate', 'gameSetup', 'gameBoard', 'spectateGame'];
     screens.forEach(screen => {
-      elements[screen].style.display = screen === screenName ? 'block' : 'none';
+      if (elements[screen]) {
+        elements[screen].style.display = screen === screenName ? 'block' : 'none';
+      }
     });
   }
 
@@ -220,7 +247,7 @@ class UIManager {
     if (rooms.length === 0) {
       const noRoomsMsg = document.createElement('div');
       noRoomsMsg.className = 'no-rooms-message';
-      noRoomsMsg.textContent = '현재 참가할 수 있는 방이 없습니다.';
+      noRoomsMsg.innerHTML = '<i class="fas fa-inbox"></i><p>현재 참가할 수 있는 방이 없습니다.</p>';
       elements.roomList.appendChild(noRoomsMsg);
       return;
     }
@@ -233,6 +260,30 @@ class UIManager {
       joinBtn.addEventListener('click', () => RoomManager.joinRoom(room.id));
       
       elements.roomList.appendChild(roomItem);
+    });
+  }
+
+  static displaySpectateList(games) {
+    elements.spectateList.innerHTML = '';
+    
+    if (games.length === 0) {
+      const noGamesMsg = document.createElement('div');
+      noGamesMsg.className = 'no-games-message';
+      noGamesMsg.innerHTML = '<i class="fas fa-chess-board"></i><p>현재 진행 중인 게임이 없습니다.</p>';
+      elements.spectateList.appendChild(noGamesMsg);
+      return;
+    }
+    
+    games.forEach(game => {
+      const spectateItem = elements.spectateItemTemplate.content.cloneNode(true);
+      spectateItem.querySelector('.game-players').textContent = `${game.whitePlayer} vs ${game.blackPlayer}`;
+      spectateItem.querySelector('.spectator-count').innerHTML = `<i class="fas fa-eye"></i> ${game.spectatorCount}명 관전`;
+      spectateItem.querySelector('.move-count').innerHTML = `<i class="fas fa-chess-pawn"></i> ${game.moveCount}수`;
+      
+      const spectateBtn = spectateItem.querySelector('.spectate-btn');
+      spectateBtn.addEventListener('click', () => SpectateManager.spectateRoom(game.id));
+      
+      elements.spectateList.appendChild(spectateItem);
     });
   }
 }
@@ -287,15 +338,137 @@ class RoomManager {
   }
 }
 
+// 관전 관리 클래스
+class SpectateManager {
+  static spectateRoom(roomId) {
+    const spectatorName = elements.spectatorNameInput.value.trim() || gameState.playerName;
+    
+    if (!spectatorName) {
+      UIManager.showNotification('관전자 이름을 입력해주세요.');
+      return;
+    }
+    
+    gameState.spectatorName = spectatorName;
+    socket.emit('spectateRoom', { roomId, spectatorName });
+  }
+
+  static leaveSpectate() {
+    if (gameState.currentRoom && gameState.isSpectating) {
+      socket.emit('leaveSpectate', gameState.currentRoom);
+      this.backToSpectateList();
+    }
+  }
+
+  static backToSpectateList() {
+    Object.assign(gameState, {
+      currentRoom: null,
+      isSpectating: false,
+      gameBoard: null,
+      selectedSquare: null
+    });
+    
+    UIManager.showScreen('spectate');
+    SpectatorChatManager.clearChat();
+    this.getSpectateList();
+  }
+
+  static getSpectateList() {
+    socket.emit('getSpectateList');
+  }
+}
+
+// 관전자 채팅 관리 클래스
+class SpectatorChatManager {
+  static init() {
+    if (elements.sendSpectatorChatBtn) {
+      elements.sendSpectatorChatBtn.addEventListener('click', this.sendMessage);
+    }
+    if (elements.spectatorChatInput) {
+      elements.spectatorChatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') this.sendMessage();
+      });
+    }
+  }
+
+  static sendMessage() {
+    const message = elements.spectatorChatInput.value.trim();
+    if (!message || !gameState.currentRoom || !gameState.isSpectating) return;
+
+    socket.emit('sendSpectatorMessage', {
+      roomId: gameState.currentRoom,
+      message: message,
+      spectatorName: gameState.spectatorName
+    });
+
+    elements.spectatorChatInput.value = '';
+  }
+
+  static addMessage(messageData) {
+    const messageElement = document.createElement('div');
+    messageElement.className = 'chat-message spectator-message';
+    
+    // 자신의 메시지인지 확인
+    const isOwnMessage = messageData.socketId === socket.id;
+    messageElement.classList.add(isOwnMessage ? 'own' : 'other');
+
+    // 시간 포맷팅
+    const timestamp = new Date(messageData.timestamp);
+    const timeString = timestamp.toLocaleTimeString('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    messageElement.innerHTML = `
+      <div class="message-header">${this.escapeHtml(messageData.spectatorName)} <span class="spectator-badge">관전자</span></div>
+      <div class="message-text">${this.escapeHtml(messageData.message)}</div>
+      <div class="message-time">${timeString}</div>
+    `;
+
+    elements.spectatorChatMessages.appendChild(messageElement);
+    this.scrollToBottom();
+  }
+
+  static loadChatHistory(chatHistory) {
+    elements.spectatorChatMessages.innerHTML = '';
+    if (!chatHistory || chatHistory.length === 0) {
+      elements.spectatorChatMessages.innerHTML = '<div class="no-messages">아직 관전자 채팅이 없습니다.</div>';
+      return;
+    }
+
+    chatHistory.forEach(message => {
+      this.addMessage(message);
+    });
+  }
+
+  static clearChat() {
+    if (elements.spectatorChatMessages) {
+      elements.spectatorChatMessages.innerHTML = '<div class="no-messages">아직 관전자 채팅이 없습니다.</div>';
+    }
+  }
+
+  static scrollToBottom() {
+    if (elements.spectatorChatMessages) {
+      elements.spectatorChatMessages.scrollTop = elements.spectatorChatMessages.scrollHeight;
+    }
+  }
+
+  static escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+}
+
 // 체스판 렌더링 클래스
 class BoardRenderer {
-  static render(boardData) {
+  static render(boardData, boardElement = elements.board) {
     if (!boardData) return;
     
     gameState.gameBoard = boardData;
-    elements.board.innerHTML = '';
+    boardElement.innerHTML = '';
     
-    const isWhite = gameState.playerColor === 'white';
+    // 관전 모드일 때는 항상 백 플레이어 시점으로 렌더링
+    const isWhite = gameState.isSpectating ? true : (gameState.playerColor === 'white');
     
     // 흑 플레이어일 때는 보드를 뒤집어서 렌더링
     const rowOrder = isWhite ? Array.from({length: 8}, (_, i) => i) : Array.from({length: 8}, (_, i) => 7 - i);
@@ -306,22 +479,28 @@ class BoardRenderer {
         const actualRow = rowOrder[displayRow];
         const actualCol = colOrder[displayCol];
         
-        const square = this.createSquare(actualRow, actualCol, displayRow, displayCol);
+        const square = this.createSquare(actualRow, actualCol, displayRow, displayCol, gameState.isSpectating);
         const piece = boardData[actualRow][actualCol];
         
         if (piece) {
           square.appendChild(this.createPieceElement(piece));
         }
         
-        elements.board.appendChild(square);
+        boardElement.appendChild(square);
       }
     }
     
-    UIManager.updateGameInfo();
-    UIManager.updateBackgroundColor();
+    if (!gameState.isSpectating) {
+      UIManager.updateGameInfo();
+      UIManager.updateBackgroundColor();
+    }
   }
 
-  static createSquare(actualRow, actualCol, displayRow, displayCol) {
+  static renderSpectateBoard(boardData) {
+    this.render(boardData, elements.spectateBoard);
+  }
+
+  static createSquare(actualRow, actualCol, displayRow, displayCol, isSpectating = false) {
     const square = document.createElement('div');
     square.className = 'square';
     
@@ -331,7 +510,11 @@ class BoardRenderer {
     // 실제 데이터 좌표 저장
     square.dataset.row = actualRow;
     square.dataset.col = actualCol;
-    square.addEventListener('click', GameLogic.handleSquareClick);
+    
+    // 관전 모드가 아닐 때만 클릭 이벤트 추가
+    if (!isSpectating) {
+      square.addEventListener('click', GameLogic.handleSquareClick);
+    }
     
     return square;
   }
@@ -685,6 +868,17 @@ class EventManager {
     elements.restartBtn.addEventListener('click', GameLogic.restartGame);
     elements.leaveGameBtn.addEventListener('click', RoomManager.leaveRoom);
     
+    // 관전 버튼 이벤트
+    if (elements.refreshSpectateListBtn) {
+      elements.refreshSpectateListBtn.addEventListener('click', SpectateManager.getSpectateList);
+    }
+    if (elements.leaveSpectateBtn) {
+      elements.leaveSpectateBtn.addEventListener('click', SpectateManager.leaveSpectate);
+    }
+    if (elements.backToSpectateListBtn) {
+      elements.backToSpectateListBtn.addEventListener('click', SpectateManager.backToSpectateList);
+    }
+    
     // 체스 규칙 패널
     if (elements.showRulesBtn) {
       elements.showRulesBtn.addEventListener('click', EventManager.toggleRulesPanel);
@@ -695,6 +889,7 @@ class EventManager {
 
     // 채팅 이벤트 초기화
     ChatManager.init();
+    SpectatorChatManager.init();
     
     // 소켓 이벤트
     EventManager.setupSocketEvents();
@@ -702,9 +897,14 @@ class EventManager {
 
   static setupSocketEvents() {
     socket.on('roomList', UIManager.displayRoomList);
+    socket.on('spectateList', UIManager.displaySpectateList);
     
     socket.on('roomListUpdated', () => {
       RoomManager.getRoomList();
+    });
+    
+    socket.on('spectateListUpdated', () => {
+      SpectateManager.getSpectateList();
     });
     
     socket.on('roomCreated', (data) => {
@@ -876,6 +1076,104 @@ class EventManager {
     socket.on('chatMessage', (messageData) => {
       ChatManager.addMessage(messageData);
     });
+
+    // 관전 관련 이벤트
+    socket.on('spectateJoined', (data) => {
+      gameState.currentRoom = data.roomId;
+      gameState.isSpectating = true;
+      gameState.currentTurn = data.turn;
+      
+      UIManager.showScreen('spectateGame');
+      BoardRenderer.renderSpectateBoard(data.board);
+      
+      // 게임 정보 업데이트
+      elements.spectateGameInfo.textContent = `방 ID: ${data.roomId}`;
+      elements.spectateCurrentTurn.textContent = `현재 턴: ${data.turn === 'white' ? '백' : '흑'}`;
+      elements.spectateWhitePlayerInfo.querySelector('span').textContent = `백: ${data.whitePlayer}`;
+      elements.spectateBlackPlayerInfo.querySelector('span').textContent = `흑: ${data.blackPlayer}`;
+      
+      // 관전자 채팅 히스토리 로드
+      if (data.spectatorChatHistory) {
+        SpectatorChatManager.loadChatHistory(data.spectatorChatHistory);
+      } else {
+        SpectatorChatManager.clearChat();
+      }
+      
+      UIManager.showNotification(`${data.whitePlayer} vs ${data.blackPlayer} 게임을 관전합니다.`);
+    });
+
+    socket.on('spectatorJoined', (data) => {
+      if (gameState.isSpectating) {
+        elements.spectatorCount.textContent = `관전자: ${data.spectatorCount}명`;
+        UIManager.showNotification(`${data.spectatorName}님이 관전을 시작했습니다.`);
+      }
+    });
+
+    socket.on('spectatorLeft', (data) => {
+      if (gameState.isSpectating) {
+        elements.spectatorCount.textContent = `관전자: ${data.spectatorCount}명`;
+      }
+    });
+
+    socket.on('spectateGameStart', (data) => {
+      if (gameState.isSpectating) {
+        gameState.currentTurn = data.turn;
+        BoardRenderer.renderSpectateBoard(data.board);
+        elements.spectateCurrentTurn.textContent = `현재 턴: ${data.turn === 'white' ? '백' : '흑'}`;
+        UIManager.showNotification('게임이 시작되었습니다!');
+      }
+    });
+
+    socket.on('spectatorBoardUpdate', (data) => {
+      if (gameState.isSpectating) {
+        gameState.currentTurn = data.turn;
+        BoardRenderer.renderSpectateBoard(data.board);
+        elements.spectateCurrentTurn.textContent = `현재 턴: ${data.turn === 'white' ? '백' : '흑'}`;
+        
+        // 관전자도 이동 소리 재생
+        if (data.moveDetails) {
+          if (data.moveDetails.castling) {
+            if (data.moveDetails.castling === 'kingside') {
+              audioManager.play('king-castling');
+            } else if (data.moveDetails.castling === 'queenside') {
+              audioManager.play('queen-castling');
+            }
+          } else if (data.moveDetails.from && data.moveDetails.to) {
+            const [fromRow, fromCol] = data.moveDetails.from;
+            const [toRow, toCol] = data.moveDetails.to;
+            const piece = data.moveDetails.piece;
+            
+            const castlingType = AudioManager.detectCastling(fromRow, fromCol, toRow, toCol, piece);
+            if (castlingType) {
+              if (castlingType === 'kingside') {
+                audioManager.play('king-castling');
+              } else if (castlingType === 'queenside') {
+                audioManager.play('queen-castling');
+              }
+            } else {
+              audioManager.play(data.moveDetails.capture ? 'capture' : 'move');
+            }
+          } else {
+            audioManager.play(data.moveDetails.capture ? 'capture' : 'move');
+          }
+        }
+      }
+    });
+
+    socket.on('gameEnded', (data) => {
+      if (gameState.isSpectating) {
+        UIManager.showNotification(`게임이 종료되었습니다: ${data.reason}`);
+        setTimeout(() => {
+          SpectateManager.backToSpectateList();
+        }, 3000);
+      }
+    });
+
+    socket.on('spectatorChatMessage', (messageData) => {
+      if (gameState.isSpectating) {
+        SpectatorChatManager.addMessage(messageData);
+      }
+    });
   }
 
   static toggleRulesPanel() {
@@ -922,12 +1220,40 @@ function init() {
   const audioManager = new AudioManager();
   
   EventManager.init();
+  setupNavigation();
 
   // 초기 UI 업데이트
   UIManager.updateGameInfo();
 
   // 모든 오디오 테스트
   // testAllAudio();
+}
+
+// 네비게이션 설정
+function setupNavigation() {
+  // 네비게이션 링크 이벤트 설정
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+      const href = link.getAttribute('href');
+      
+      if (href === '#lobby') {
+        e.preventDefault();
+        UIManager.showScreen('lobby');
+        RoomManager.getRoomList();
+      } else if (href === '#spectate') {
+        e.preventDefault();
+        UIManager.showScreen('spectate');
+        SpectateManager.getSpectateList();
+      } else if (href === '#gameBoard') {
+        e.preventDefault();
+        if (gameState.currentRoom && !gameState.isSpectating) {
+          UIManager.showScreen('gameBoard');
+        } else {
+          UIManager.showNotification('현재 진행 중인 게임이 없습니다.');
+        }
+      }
+    });
+  });
 }
 
 // 사용자 정보 초기화
@@ -940,6 +1266,11 @@ async function initializeUser() {
       gameState.playerName = authData.user.nickname;
       elements.playerNameInput.value = authData.user.nickname;
       elements.playerNameInput.readOnly = true;
+      
+      // 관전자 이름도 기본값으로 설정
+      if (elements.spectatorNameInput) {
+        elements.spectatorNameInput.value = authData.user.nickname;
+      }
     } else {
       alert('로그인이 필요합니다.');
       window.location.href = '/login.html';
