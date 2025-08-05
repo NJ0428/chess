@@ -6,6 +6,7 @@ const session = require('express-session');
 const SQLiteStore = require('connect-sqlite3')(session);
 const bcrypt = require('bcrypt');
 const db = require('./server/database.js'); // 데이터베이스 설정 가져오기
+const { EloRatingSystem, GameStatsManager } = require('./server/gameStats.js');
 
 const app = express();
 const server = http.createServer(app);
@@ -125,6 +126,127 @@ app.get('/api/auth/status', (req, res) => {
   }
 });
 
+// 통계 API 엔드포인트들
+
+// 플레이어 통계 조회
+app.get('/api/stats/player/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const stats = await GameStatsManager.getPlayerStats(userId);
+
+    if (!stats) {
+      return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
+    }
+
+    // ELO 등급 정보 추가
+    const ratingTier = EloRatingSystem.getRatingTier(stats.elo_rating);
+
+    res.json({
+      ...stats,
+      rating_tier: ratingTier,
+      win_rate: stats.games_played > 0 ? Math.round((stats.wins / stats.games_played) * 100) : 0
+    });
+  } catch (error) {
+    console.error('플레이어 통계 조회 실패:', error);
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// 내 통계 조회 (로그인된 사용자)
+app.get('/api/stats/me', async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+
+  try {
+    const stats = await GameStatsManager.getPlayerStats(req.session.userId);
+    const ratingTier = EloRatingSystem.getRatingTier(stats.elo_rating);
+
+    res.json({
+      ...stats,
+      rating_tier: ratingTier,
+      win_rate: stats.games_played > 0 ? Math.round((stats.wins / stats.games_played) * 100) : 0
+    });
+  } catch (error) {
+    console.error('내 통계 조회 실패:', error);
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// 게임 히스토리 조회
+app.get('/api/stats/history', async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+
+  try {
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = parseInt(req.query.offset) || 0;
+
+    const history = await GameStatsManager.getGameHistory(req.session.userId, limit, offset);
+
+    // 각 게임에 대한 추가 정보 계산
+    const enrichedHistory = history.map(game => {
+      const isWhitePlayer = game.white_player_id === req.session.userId;
+      const playerResult = game.winner === 'draw' ? 'draw' :
+        (isWhitePlayer && game.winner === 'white') ||
+          (!isWhitePlayer && game.winner === 'black') ? 'win' : 'loss';
+
+      return {
+        ...game,
+        player_color: isWhitePlayer ? 'white' : 'black',
+        player_result: playerResult,
+        opponent_name: isWhitePlayer ? game.black_nickname : game.white_nickname,
+        player_elo_before: isWhitePlayer ? game.white_elo_before : game.black_elo_before,
+        player_elo_after: isWhitePlayer ? game.white_elo_after : game.black_elo_after,
+        elo_change: isWhitePlayer ?
+          (game.white_elo_after - game.white_elo_before) :
+          (game.black_elo_after - game.black_elo_before)
+      };
+    });
+
+    res.json(enrichedHistory);
+  } catch (error) {
+    console.error('게임 히스토리 조회 실패:', error);
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// 리더보드 조회
+app.get('/api/stats/leaderboard', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const leaderboard = await GameStatsManager.getLeaderboard(limit);
+
+    // 각 플레이어에 등급 정보 추가
+    const enrichedLeaderboard = leaderboard.map((player, index) => ({
+      ...player,
+      rank: index + 1,
+      rating_tier: EloRatingSystem.getRatingTier(player.elo_rating)
+    }));
+
+    res.json(enrichedLeaderboard);
+  } catch (error) {
+    console.error('리더보드 조회 실패:', error);
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// 사용자 업적 조회
+app.get('/api/stats/achievements', async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+
+  try {
+    const achievements = await GameStatsManager.getUserAchievements(req.session.userId);
+    res.json(achievements);
+  } catch (error) {
+    console.error('업적 조회 실패:', error);
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+});
+
 let rooms = {};
 
 // 체스 게임 클래스
@@ -132,6 +254,7 @@ class ChessGame {
   constructor() {
     this.games = {};
     this.spectators = {}; // 관전자 정보 저장
+    this.gameStats = {}; // 게임 통계 정보 저장
     this.setupSocketEvents();
   }
 
@@ -258,7 +381,7 @@ class ChessGame {
     io.emit('roomListUpdated');
     io.emit('spectateListUpdated');
 
-    setTimeout(() => {
+    setTimeout(async () => {
       io.to(roomId).emit('gameStart', {
         board: room.board,
         turn: room.currentTurn,
@@ -276,6 +399,37 @@ class ChessGame {
             blackPlayer: room.playerNames.black
           });
         }
+      }
+
+      // 게임 통계 기록 시작
+      try {
+        // 플레이어 ID 조회
+        const getPlayerIds = `SELECT id, nickname FROM users WHERE nickname IN (?, ?)`;
+        db.all(getPlayerIds, [room.playerNames.white, room.playerNames.black], async (err, players) => {
+          if (!err && players.length === 2) {
+            const whitePlayer = players.find(p => p.nickname === room.playerNames.white);
+            const blackPlayer = players.find(p => p.nickname === room.playerNames.black);
+
+            if (whitePlayer && blackPlayer) {
+              const gameId = await GameStatsManager.recordGameStart(
+                roomId, whitePlayer.id, blackPlayer.id,
+                room.playerNames.white, room.playerNames.black
+              );
+
+              // 게임 통계 정보 저장
+              this.gameStats[roomId] = {
+                gameId: gameId,
+                whitePlayerId: whitePlayer.id,
+                blackPlayerId: blackPlayer.id,
+                startTime: Date.now(),
+                moveCount: 0,
+                moves: []
+              };
+            }
+          }
+        });
+      } catch (error) {
+        console.error('게임 시작 통계 기록 실패:', error);
       }
     }, 1000);
   }
@@ -646,11 +800,21 @@ class ChessGame {
 
     this.updateCastlingRights(room, from, movingPiece);
 
+    // 이동 통계 업데이트
+    if (this.gameStats[room.roomId || Object.keys(this.games).find(id => this.games[id] === room)]) {
+      const roomId = room.roomId || Object.keys(this.games).find(id => this.games[id] === room);
+      this.gameStats[roomId].moveCount++;
+
+      // 간단한 이동 기록 (PGN 형식으로 나중에 변환)
+      const moveNotation = this.generateMoveNotation(movingPiece, from, to, targetPiece, moveDetails);
+      this.gameStats[roomId].moves.push(moveNotation);
+    }
+
     return { gameEnded, winner, message, moveDetails };
   }
 
   // 게임 종료
-  endGame(roomId, gameResult) {
+  async endGame(roomId, gameResult) {
     const room = this.games[roomId];
     room.status = 'finished';
 
@@ -682,6 +846,9 @@ class ChessGame {
         });
       }
     }
+
+    // 게임 통계 기록
+    await this.recordGameEnd(roomId, gameResult.winner, 'checkmate');
 
     // 게임 종료 알림
     io.to(room.players.white).emit('gameOver', {
@@ -766,6 +933,105 @@ class ChessGame {
         if (row === 0 && col === 7) room.castlingRights.black.kingSide = false;
       }
     }
+  }
+
+  // 게임 종료 통계 기록
+  async recordGameEnd(roomId, winner, resultType) {
+    try {
+      const gameStats = this.gameStats[roomId];
+      if (!gameStats) return;
+
+      const gameDuration = Math.floor((Date.now() - gameStats.startTime) / 1000);
+      const movesPgn = this.generatePGN(gameStats.moves);
+
+      await GameStatsManager.recordGameEnd(
+        roomId, winner, resultType,
+        gameStats.moveCount, gameDuration, movesPgn
+      );
+
+      // 업적 확인
+      if (gameStats.whitePlayerId) {
+        const achievements = await GameStatsManager.checkAndAwardAchievements(gameStats.whitePlayerId);
+        if (achievements.length > 0) {
+          const room = this.games[roomId];
+          if (room && room.players.white) {
+            io.to(room.players.white).emit('achievementsEarned', achievements);
+          }
+        }
+      }
+
+      if (gameStats.blackPlayerId) {
+        const achievements = await GameStatsManager.checkAndAwardAchievements(gameStats.blackPlayerId);
+        if (achievements.length > 0) {
+          const room = this.games[roomId];
+          if (room && room.players.black) {
+            io.to(room.players.black).emit('achievementsEarned', achievements);
+          }
+        }
+      }
+
+      // 게임 통계 정보 삭제
+      delete this.gameStats[roomId];
+    } catch (error) {
+      console.error('게임 종료 통계 기록 실패:', error);
+    }
+  }
+
+  // PGN 형식으로 이동 기록 생성 (간단한 버전)
+  generatePGN(moves) {
+    if (!moves || moves.length === 0) return '';
+
+    let pgn = '';
+    for (let i = 0; i < moves.length; i += 2) {
+      const moveNumber = Math.floor(i / 2) + 1;
+      pgn += `${moveNumber}. ${moves[i]}`;
+      if (moves[i + 1]) {
+        pgn += ` ${moves[i + 1]}`;
+      }
+      pgn += ' ';
+    }
+    return pgn.trim();
+  }
+
+  // 이동 기록 생성 (간단한 버전)
+  generateMoveNotation(piece, from, to, capturedPiece, moveDetails) {
+    const [fromRow, fromCol] = from;
+    const [toRow, toCol] = to;
+
+    const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
+
+    const fromSquare = files[fromCol] + ranks[fromRow];
+    const toSquare = files[toCol] + ranks[toRow];
+
+    let notation = '';
+
+    // 말 종류 (폰은 생략)
+    if (piece.type !== 'pawn') {
+      notation += piece.type.charAt(0).toUpperCase();
+    }
+
+    // 캐슬링
+    if (moveDetails.special === 'castling') {
+      return toCol > fromCol ? 'O-O' : 'O-O-O';
+    }
+
+    // 캡처
+    if (capturedPiece) {
+      if (piece.type === 'pawn') {
+        notation += files[fromCol];
+      }
+      notation += 'x';
+    }
+
+    notation += toSquare;
+
+    // 앙파상
+    if (moveDetails.special === 'en_passant') {
+      notation += ' e.p.';
+    }
+
+    return notation;
   }
 }
 

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>통계 대시보드 - 소켓 체스 게임</title>
+  <link rel="stylesheet" href="main.css">
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <!-- 헤더 -->
+  <header id="header" class="header">
+    <div class="container">
+      <div class="logo">
+        <h1><a href="index.html" style="text-decoration: none; color: inherit;"><i class="fas fa-chess-king"></i> 체스 게임</a></h1>
+      </div>
+      <nav class="nav">
+        <ul class="nav-list">
+          <li><a href="index.html" class="nav-link">홈</a></li>
+          <li><a href="game.html" class="nav-link">게임</a></li>
+          <li><a href="#dashboard" class="nav-link active">통계</a></li>
+          <li><a href="#leaderboard" class="nav-link">리더보드</a></li>
+        </ul>
+      </nav>
+      <div id="auth-links" class="auth-links">
+        <!-- 로그인 상태에 따라 동적으로 변경됩니다 -->
+      </div>
+    </div>
+  </header>
+
+  <!-- 메인 콘텐츠 -->
+  <main class="stats-main">
+    <div class="container">
+      
+      <!-- 개인 통계 대시보드 -->
+      <section id="dashboard" class="stats-section dashboard-section">
+        <div class="section-header">
+          <h2><i class="fas fa-chart-line"></i> 개인 통계 대시보드</h2>
+          <p>당신의 체스 게임 통계와 성과를 확인하세요</p>
+        </div>
+        
+        <div class="dashboard-grid">
+          <!-- 기본 통계 카드들 -->
+          <div class="stats-card rating-card">
+            <div class="card-header">
+              <h3><i class="fas fa-trophy"></i> 현재 레이팅</h3>
+            </div>
+            <div class="card-content">
+              <div class="rating-display">
+                <div id="currentRating" class="rating-number">1200</div>
+                <div id="ratingTier" class="rating-tier">Novice</div>
+              </div>
+              <div class="rating-change">
+                <span id="ratingChange" class="rating-change-value">+0</span>
+                <span class="rating-change-label">최근 게임</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-card games-card">
+            <div class="card-header">
+              <h3><i class="fas fa-chess-board"></i> 게임 통계</h3>
+            </div>
+            <div class="card-content">
+              <div class="stats-grid">
+                <div class="stat-item">
+                  <div id="totalGames" class="stat-number">0</div>
+                  <div class="stat-label">총 게임</div>
+                </div>
+                <div class="stat-item">
+                  <div id="winRate" class="stat-number">0%</div>
+                  <div class="stat-label">승률</div>
+                </div>
+                <div class="stat-item">
+                  <div id="currentStreak" class="stat-number">0</div>
+                  <div class="stat-label">연속 기록</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-card record-card">
+            <div class="card-header">
+              <h3><i class="fas fa-medal"></i> 승부 기록</h3>
+            </div>
+            <div class="card-content">
+              <div class="record-chart-container">
+                <canvas id="recordChart"></canvas>
+              </div>
+              <div class="record-details">
+                <div class="record-item wins">
+                  <span id="totalWins" class="record-number">0</span>
+                  <span class="record-label">승</span>
+                </div>
+                <div class="record-item draws">
+                  <span id="totalDraws" class="record-number">0</span>
+                  <span class="record-label">무</span>
+                </div>
+                <div class="record-item losses">
+                  <span id="totalLosses" class="record-number">0</span>
+                  <span class="record-label">패</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-card achievements-card">
+            <div class="card-header">
+              <h3><i class="fas fa-award"></i> 업적</h3>
+            </div>
+            <div class="card-content">
+              <div id="achievementsList" class="achievements-list">
+                <div class="no-achievements">
+                  <i class="fas fa-star"></i>
+                  <p>아직 획득한 업적이 없습니다.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 레이팅 히스토리 차트 -->
+          <div class="stats-card chart-card">
+            <div class="card-header">
+              <h3><i class="fas fa-chart-area"></i> 레이팅 변화</h3>
+            </div>
+            <div class="card-content">
+              <canvas id="ratingChart"></canvas>
+            </div>
+          </div>
+
+          <!-- 상세 통계 -->
+          <div class="stats-card details-card">
+            <div class="card-header">
+              <h3><i class="fas fa-info-circle"></i> 상세 통계</h3>
+            </div>
+            <div class="card-content">
+              <div class="details-grid">
+                <div class="detail-item">
+                  <span class="detail-label">최고 레이팅</span>
+                  <span id="highestRating" class="detail-value">1200</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">최저 레이팅</span>
+                  <span id="lowestRating" class="detail-value">1200</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">최장 연승</span>
+                  <span id="longestWinStreak" class="detail-value">0</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">최장 연패</span>
+                  <span id="longestLoseStreak" class="detail-value">0</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">총 플레이 시간</span>
+                  <span id="totalPlaytime" class="detail-value">0분</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">마지막 게임</span>
+                  <span id="lastGameDate" class="detail-value">-</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 게임 히스토리 -->
+      <section id="history" class="stats-section history-section">
+        <div class="section-header">
+          <h2><i class="fas fa-history"></i> 게임 히스토리</h2>
+          <p>최근 플레이한 게임들의 상세 기록</p>
+        </div>
+        
+        <div class="history-controls">
+          <button id="loadMoreHistory" class="btn btn-outline">
+            <i class="fas fa-plus"></i> 더 보기
+          </button>
+        </div>
+
+        <div class="history-container">
+          <div id="gameHistoryList" class="history-list">
+            <div class="loading-message">
+              <i class="fas fa-spinner fa-spin"></i>
+              <p>게임 히스토리를 불러오는 중...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 리더보드 -->
+      <section id="leaderboard" class="stats-section leaderboard-section" style="display: none;">
+        <div class="section-header">
+          <h2><i class="fas fa-crown"></i> 리더보드</h2>
+          <p>최고의 플레이어들과 순위를 확인하세요</p>
+        </div>
+        
+        <div class="leaderboard-container">
+          <div id="leaderboardList" class="leaderboard-list">
+            <div class="loading-message">
+              <i class="fas fa-spinner fa-spin"></i>
+              <p>리더보드를 불러오는 중...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- 알림 -->
+  <div id="notification" class="notification"></div>
+
+  <!-- 업적 모달 -->
+  <div id="achievementModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <div class="achievement-modal-content">
+        <i class="fas fa-trophy achievement-icon"></i>
+        <h3>새로운 업적 달성!</h3>
+        <div id="newAchievements" class="new-achievements"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 게임 히스토리 아이템 템플릿 -->
+  <template id="historyItemTemplate">
+    <div class="history-item">
+      <div class="history-header">
+        <div class="game-result">
+          <span class="result-badge"></span>
+        </div>
+        <div class="game-info">
+          <span class="opponent-name"></span>
+          <span class="game-date"></span>
+        </div>
+        <div class="rating-change">
+          <span class="rating-change-value"></span>
+        </div>
+      </div>
+      <div class="history-details">
+        <div class="detail-item">
+          <span class="detail-label">색상:</span>
+          <span class="player-color"></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">이동 수:</span>
+          <span class="move-count"></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">게임 시간:</span>
+          <span class="game-duration"></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">결과:</span>
+          <span class="result-type"></span>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- 리더보드 아이템 템플릿 -->
+  <template id="leaderboardItemTemplate">
+    <div class="leaderboard-item">
+      <div class="rank-badge">
+        <span class="rank-number"></span>
+      </div>
+      <div class="player-info">
+        <div class="player-name"></div>
+        <div class="player-tier"></div>
+      </div>
+      <div class="player-stats">
+        <div class="stat-item">
+          <span class="stat-value rating"></span>
+          <span class="stat-label">레이팅</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value games"></span>
+          <span class="stat-label">게임</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value winrate"></span>
+          <span class="stat-label">승률</span>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- 푸터 -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-text">
+          <p>&copy; 2024 소켓 체스 게임. MIT 라이센스.</p>
+        </div>
+        <div class="footer-links">
+          <a href="index.html"><i class="fas fa-home"></i></a>
+          <a href="game.html"><i class="fas fa-chess-board"></i></a>
+          <a href="#"><i class="fab fa-github"></i></a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+  <script src="js/stats.js"></script>
+</body>
+</html>

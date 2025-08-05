@@ -149,7 +149,7 @@ class AudioManager {
           console.log(`${key} 오디오 로드 실패`);
           gameState.audioLoaded[key] = false;
         });
-        
+
         // 로드 상태 초기화
         if (audio.readyState >= 4) {
           gameState.audioLoaded[key] = true;
@@ -164,17 +164,17 @@ class AudioManager {
   play(type) {
     console.log(`오디오 재생 시도: ${type}`);
     const audio = elements.audio[type];
-    
+
     if (!audio) {
       console.log(`오디오 요소 없음: ${type}`);
       return;
     }
-    
+
     if (!gameState.audioLoaded[type]) {
       console.log(`오디오 로드되지 않음: ${type}`);
       return;
     }
-    
+
     console.log(`오디오 재생: ${type}`);
     audio.currentTime = 0;
     audio.play().catch(error => {
@@ -211,7 +211,7 @@ class UIManager {
     elements.notificationEl.textContent = message;
     elements.notificationEl.style.display = 'block';
     elements.notificationEl.style.opacity = '1';
-    
+
     setTimeout(() => {
       elements.notificationEl.style.opacity = '0';
       setTimeout(() => {
@@ -222,13 +222,13 @@ class UIManager {
 
   static updateGameInfo() {
     if (elements.playerColorEl) {
-      const playerColorText = gameState.playerColor 
+      const playerColorText = gameState.playerColor
         ? (gameState.playerColor === 'white' ? '백' : '흑')
         : '대기 중';
       elements.playerColorEl.textContent = `내 색상: ${playerColorText}`;
     }
     if (elements.currentTurnEl) {
-      const currentTurnText = gameState.currentTurn 
+      const currentTurnText = gameState.currentTurn
         ? (gameState.currentTurn === 'white' ? '백' : '흑')
         : '대기 중';
       elements.currentTurnEl.textContent = `현재 턴: ${currentTurnText}`;
@@ -243,7 +243,7 @@ class UIManager {
 
   static displayRoomList(rooms) {
     elements.roomList.innerHTML = '';
-    
+
     if (rooms.length === 0) {
       const noRoomsMsg = document.createElement('div');
       noRoomsMsg.className = 'no-rooms-message';
@@ -251,21 +251,21 @@ class UIManager {
       elements.roomList.appendChild(noRoomsMsg);
       return;
     }
-    
+
     rooms.forEach(room => {
       const roomItem = elements.roomItemTemplate.content.cloneNode(true);
       roomItem.querySelector('.room-id').textContent = room.id;
-      
+
       const joinBtn = roomItem.querySelector('.join-btn');
       joinBtn.addEventListener('click', () => RoomManager.joinRoom(room.id));
-      
+
       elements.roomList.appendChild(roomItem);
     });
   }
 
   static displaySpectateList(games) {
     elements.spectateList.innerHTML = '';
-    
+
     if (games.length === 0) {
       const noGamesMsg = document.createElement('div');
       noGamesMsg.className = 'no-games-message';
@@ -273,16 +273,16 @@ class UIManager {
       elements.spectateList.appendChild(noGamesMsg);
       return;
     }
-    
+
     games.forEach(game => {
       const spectateItem = elements.spectateItemTemplate.content.cloneNode(true);
       spectateItem.querySelector('.game-players').textContent = `${game.whitePlayer} vs ${game.blackPlayer}`;
       spectateItem.querySelector('.spectator-count').innerHTML = `<i class="fas fa-eye"></i> ${game.spectatorCount}명 관전`;
       spectateItem.querySelector('.move-count').innerHTML = `<i class="fas fa-chess-pawn"></i> ${game.moveCount}수`;
-      
+
       const spectateBtn = spectateItem.querySelector('.spectate-btn');
       spectateBtn.addEventListener('click', () => SpectateManager.spectateRoom(game.id));
-      
+
       elements.spectateList.appendChild(spectateItem);
     });
   }
@@ -293,12 +293,12 @@ class RoomManager {
   static createRoom() {
     // gameState.playerName은 initializeUser에서 설정됨
     const roomId = elements.roomIdInput.value.trim();
-    
+
     if (!roomId) {
       UIManager.showNotification('방 아이디를 입력해주세요.');
       return;
     }
-    
+
     socket.emit('createRoom', { roomId, playerName: gameState.playerName });
   }
 
@@ -308,7 +308,7 @@ class RoomManager {
       UIManager.showNotification('방 아이디가 없습니다.');
       return;
     }
-    
+
     socket.emit('joinRoom', { roomId, playerName: gameState.playerName });
   }
 
@@ -327,7 +327,7 @@ class RoomManager {
       selectedSquare: null,
       myTurn: false
     });
-    
+
     UIManager.showScreen('lobby');
     ChatManager.clearChat();
     this.getRoomList();
@@ -342,12 +342,12 @@ class RoomManager {
 class SpectateManager {
   static spectateRoom(roomId) {
     const spectatorName = elements.spectatorNameInput.value.trim() || gameState.playerName;
-    
+
     if (!spectatorName) {
       UIManager.showNotification('관전자 이름을 입력해주세요.');
       return;
     }
-    
+
     gameState.spectatorName = spectatorName;
     socket.emit('spectateRoom', { roomId, spectatorName });
   }
@@ -366,7 +366,7 @@ class SpectateManager {
       gameBoard: null,
       selectedSquare: null
     });
-    
+
     UIManager.showScreen('spectate');
     SpectatorChatManager.clearChat();
     this.getSpectateList();
@@ -406,7 +406,7 @@ class SpectatorChatManager {
   static addMessage(messageData) {
     const messageElement = document.createElement('div');
     messageElement.className = 'chat-message spectator-message';
-    
+
     // 자신의 메시지인지 확인
     const isOwnMessage = messageData.socketId === socket.id;
     messageElement.classList.add(isOwnMessage ? 'own' : 'other');
@@ -463,33 +463,33 @@ class SpectatorChatManager {
 class BoardRenderer {
   static render(boardData, boardElement = elements.board) {
     if (!boardData) return;
-    
+
     gameState.gameBoard = boardData;
     boardElement.innerHTML = '';
-    
+
     // 관전 모드일 때는 항상 백 플레이어 시점으로 렌더링
     const isWhite = gameState.isSpectating ? true : (gameState.playerColor === 'white');
-    
+
     // 흑 플레이어일 때는 보드를 뒤집어서 렌더링
-    const rowOrder = isWhite ? Array.from({length: 8}, (_, i) => i) : Array.from({length: 8}, (_, i) => 7 - i);
-    const colOrder = isWhite ? Array.from({length: 8}, (_, i) => i) : Array.from({length: 8}, (_, i) => 7 - i);
-    
+    const rowOrder = isWhite ? Array.from({ length: 8 }, (_, i) => i) : Array.from({ length: 8 }, (_, i) => 7 - i);
+    const colOrder = isWhite ? Array.from({ length: 8 }, (_, i) => i) : Array.from({ length: 8 }, (_, i) => 7 - i);
+
     for (let displayRow = 0; displayRow < 8; displayRow++) {
       for (let displayCol = 0; displayCol < 8; displayCol++) {
         const actualRow = rowOrder[displayRow];
         const actualCol = colOrder[displayCol];
-        
+
         const square = this.createSquare(actualRow, actualCol, displayRow, displayCol, gameState.isSpectating);
         const piece = boardData[actualRow][actualCol];
-        
+
         if (piece) {
           square.appendChild(this.createPieceElement(piece));
         }
-        
+
         boardElement.appendChild(square);
       }
     }
-    
+
     if (!gameState.isSpectating) {
       UIManager.updateGameInfo();
       UIManager.updateBackgroundColor();
@@ -503,19 +503,19 @@ class BoardRenderer {
   static createSquare(actualRow, actualCol, displayRow, displayCol, isSpectating = false) {
     const square = document.createElement('div');
     square.className = 'square';
-    
+
     // 체스판 색상은 display 좌표 기준으로 결정
     square.classList.add((displayRow + displayCol) % 2 === 0 ? 'white' : 'black');
-    
+
     // 실제 데이터 좌표 저장
     square.dataset.row = actualRow;
     square.dataset.col = actualCol;
-    
+
     // 관전 모드가 아닐 때만 클릭 이벤트 추가
     if (!isSpectating) {
       square.addEventListener('click', GameLogic.handleSquareClick);
     }
-    
+
     return square;
   }
 
@@ -525,7 +525,7 @@ class BoardRenderer {
     pieceEl.src = CONSTANTS.PIECE_IMAGES[piece.color][piece.type];
     pieceEl.alt = `${piece.color} ${piece.type}`;
     pieceEl.draggable = false;
-    
+
     return pieceEl;
   }
 
@@ -541,18 +541,18 @@ class BoardRenderer {
 class GameLogic {
   static handleSquareClick(event) {
     console.log('클릭 이벤트 발생! myTurn:', gameState.myTurn, 'playerColor:', gameState.playerColor, 'currentTurn:', gameState.currentTurn);
-    
+
     if (!gameState.myTurn) {
       console.log('내 턴이 아니므로 클릭 무시됨');
       return;
     }
-    
+
     const square = event.currentTarget;
     const row = parseInt(square.dataset.row);
     const col = parseInt(square.dataset.col);
-    
+
     console.log('클릭한 위치:', { row, col });
-    
+
     if (gameState.selectedSquare) {
       GameLogic.handleMoveAttempt(row, col);
     } else {
@@ -562,20 +562,20 @@ class GameLogic {
 
   static handleMoveAttempt(row, col) {
     const [fromRow, fromCol] = gameState.selectedSquare;
-    
+
     socket.emit('movePiece', {
       roomId: gameState.currentRoom,
       from: [fromRow, fromCol],
       to: [row, col],
       color: gameState.playerColor
     });
-    
+
     BoardRenderer.clearSelection();
   }
 
   static handlePieceSelection(row, col, square) {
     const piece = GameLogic.getPieceAt(row, col);
-    
+
     if (piece && piece.color === gameState.playerColor) {
       BoardRenderer.clearSelection();
       square.classList.add('selected');
@@ -591,22 +591,22 @@ class GameLogic {
   static showPossibleMoves(row, col, piece) {
     // 실제로는 서버에서 검증하므로 간단한 시각적 표시만 제공
     const possibleMoves = [];
-    
+
     // 폰의 경우
     if (piece.type === 'pawn') {
       const direction = piece.color === 'white' ? -1 : 1;
       const startRow = piece.color === 'white' ? 6 : 1;
-      
+
       // 앞으로 한 칸
       if (GameLogic.isValidPosition(row + direction, col) && !GameLogic.getPieceAt(row + direction, col)) {
         possibleMoves.push({ row: row + direction, col: col, type: CONSTANTS.MOVE_TYPES.VALID_MOVE });
-        
+
         // 첫 이동시 두 칸
         if (row === startRow && !GameLogic.getPieceAt(row + 2 * direction, col)) {
           possibleMoves.push({ row: row + 2 * direction, col: col, type: CONSTANTS.MOVE_TYPES.VALID_MOVE });
         }
       }
-      
+
       // 대각선 공격
       [-1, 1].forEach(colOffset => {
         const newRow = row + direction;
@@ -618,7 +618,7 @@ class GameLogic {
           }
         }
       });
-      
+
       // 앙파상 (En passant) - 간단한 검사
       [-1, 1].forEach(colOffset => {
         const newCol = col + colOffset;
@@ -636,7 +636,7 @@ class GameLogic {
         const moves = GameLogic.calculateDirectionalMoves(row, col, direction, piece);
         possibleMoves.push(...moves);
       });
-      
+
       // 캐슬링 체크
       const castlingMoves = GameLogic.checkCastlingMoves(row, col, piece);
       possibleMoves.push(...castlingMoves);
@@ -648,7 +648,7 @@ class GameLogic {
         possibleMoves.push(...moves);
       });
     }
-    
+
     possibleMoves.forEach(move => {
       const targetSquare = document.querySelector(`[data-row="${move.row}"][data-col="${move.col}"]`);
       if (targetSquare) {
@@ -660,12 +660,12 @@ class GameLogic {
   static calculatePossibleMoves(row, col, piece) {
     const moves = [];
     const directions = GameLogic.getPieceDirections(piece.type);
-    
+
     directions.forEach(direction => {
       const pieceMoves = GameLogic.calculateDirectionalMoves(row, col, direction, piece);
       moves.push(...pieceMoves);
     });
-    
+
     return moves;
   }
 
@@ -678,7 +678,7 @@ class GameLogic {
       queen: [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]],
       king: [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]
     };
-    
+
     return directions[pieceType] || [];
   }
 
@@ -687,35 +687,35 @@ class GameLogic {
     const [rowStep, colStep] = direction;
     let newRow = row + rowStep;
     let newCol = col + colStep;
-    
+
     while (GameLogic.isValidPosition(newRow, newCol)) {
       const targetPiece = GameLogic.getPieceAt(newRow, newCol);
-      
+
       if (targetPiece) {
         if (targetPiece.color !== piece.color) {
-          moves.push({ 
-            row: newRow, 
-            col: newCol, 
-            type: CONSTANTS.MOVE_TYPES.VALID_CAPTURE 
+          moves.push({
+            row: newRow,
+            col: newCol,
+            type: CONSTANTS.MOVE_TYPES.VALID_CAPTURE
           });
         }
         break;
       } else {
-        moves.push({ 
-          row: newRow, 
-          col: newCol, 
-          type: CONSTANTS.MOVE_TYPES.VALID_MOVE 
+        moves.push({
+          row: newRow,
+          col: newCol,
+          type: CONSTANTS.MOVE_TYPES.VALID_MOVE
         });
       }
-      
+
       if (piece.type === 'pawn' || piece.type === 'knight' || piece.type === 'king') {
         break;
       }
-      
+
       newRow += rowStep;
       newCol += colStep;
     }
-    
+
     return moves;
   }
 
@@ -725,15 +725,15 @@ class GameLogic {
 
   static checkCastlingMoves(row, col, piece) {
     const castlingMoves = [];
-    
+
     // 킹이 초기 위치에 있는지 확인
     const kingStartRow = piece.color === 'white' ? 7 : 0;
     const kingStartCol = 4;
-    
+
     if (row !== kingStartRow || col !== kingStartCol) {
       return castlingMoves;
     }
-    
+
     // 킹사이드 캐슬링 (짧은 캐슬링)
     const kingsideRook = GameLogic.getPieceAt(kingStartRow, 7);
     if (kingsideRook && kingsideRook.type === 'rook' && kingsideRook.color === piece.color) {
@@ -745,16 +745,16 @@ class GameLogic {
           break;
         }
       }
-      
+
       if (canCastleKingside) {
-        castlingMoves.push({ 
-          row: kingStartRow, 
-          col: 6, 
-          type: CONSTANTS.MOVE_TYPES.VALID_CASTLING 
+        castlingMoves.push({
+          row: kingStartRow,
+          col: 6,
+          type: CONSTANTS.MOVE_TYPES.VALID_CASTLING
         });
       }
     }
-    
+
     // 퀸사이드 캐슬링 (긴 캐슬링)
     const queensideRook = GameLogic.getPieceAt(kingStartRow, 0);
     if (queensideRook && queensideRook.type === 'rook' && queensideRook.color === piece.color) {
@@ -766,16 +766,16 @@ class GameLogic {
           break;
         }
       }
-      
+
       if (canCastleQueenside) {
-        castlingMoves.push({ 
-          row: kingStartRow, 
-          col: 2, 
-          type: CONSTANTS.MOVE_TYPES.VALID_CASTLING 
+        castlingMoves.push({
+          row: kingStartRow,
+          col: 2,
+          type: CONSTANTS.MOVE_TYPES.VALID_CASTLING
         });
       }
     }
-    
+
     return castlingMoves;
   }
 
@@ -809,7 +809,7 @@ class ChatManager {
   static addMessage(messageData) {
     const messageElement = document.createElement('div');
     messageElement.className = 'chat-message';
-    
+
     // 자신의 메시지인지 확인
     const isOwnMessage = messageData.playerColor === gameState.playerColor;
     messageElement.classList.add(isOwnMessage ? 'own' : 'opponent');
@@ -867,7 +867,7 @@ class EventManager {
     elements.backToLobbyBtn.addEventListener('click', RoomManager.backToLobby);
     elements.restartBtn.addEventListener('click', GameLogic.restartGame);
     elements.leaveGameBtn.addEventListener('click', RoomManager.leaveRoom);
-    
+
     // 관전 버튼 이벤트
     if (elements.refreshSpectateListBtn) {
       elements.refreshSpectateListBtn.addEventListener('click', SpectateManager.getSpectateList);
@@ -878,7 +878,7 @@ class EventManager {
     if (elements.backToSpectateListBtn) {
       elements.backToSpectateListBtn.addEventListener('click', SpectateManager.backToSpectateList);
     }
-    
+
     // 체스 규칙 패널
     if (elements.showRulesBtn) {
       elements.showRulesBtn.addEventListener('click', EventManager.toggleRulesPanel);
@@ -890,7 +890,7 @@ class EventManager {
     // 채팅 이벤트 초기화
     ChatManager.init();
     SpectatorChatManager.init();
-    
+
     // 소켓 이벤트
     EventManager.setupSocketEvents();
   }
@@ -898,21 +898,21 @@ class EventManager {
   static setupSocketEvents() {
     socket.on('roomList', UIManager.displayRoomList);
     socket.on('spectateList', UIManager.displaySpectateList);
-    
+
     socket.on('roomListUpdated', () => {
       RoomManager.getRoomList();
     });
-    
+
     socket.on('spectateListUpdated', () => {
       SpectateManager.getSpectateList();
     });
-    
+
     socket.on('roomCreated', (data) => {
       gameState.currentRoom = data.roomId;
       gameState.playerColor = data.color;
       UIManager.showScreen('gameSetup');
       elements.roomInfo.textContent = `방 아이디: ${data.roomId}`;
-      
+
       // 채팅 히스토리 로드
       if (data.chatHistory) {
         ChatManager.loadChatHistory(data.chatHistory);
@@ -920,13 +920,13 @@ class EventManager {
         ChatManager.clearChat();
       }
     });
-    
+
     socket.on('roomJoined', (data) => {
       gameState.currentRoom = data.roomId;
       gameState.playerColor = data.color;
       UIManager.showScreen('gameSetup');
       elements.roomInfo.textContent = `방 아이디: ${data.roomId}`;
-      
+
       // 채팅 히스토리 로드
       if (data.chatHistory) {
         ChatManager.loadChatHistory(data.chatHistory);
@@ -934,11 +934,11 @@ class EventManager {
         ChatManager.clearChat();
       }
     });
-    
+
     socket.on('opponentJoined', (data) => {
       UIManager.showNotification(`${data.opponentName}님이 게임에 참가했습니다.`);
     });
-    
+
     socket.on('gameStart', (data) => {
       console.log('게임 시작:', data);
       UIManager.showScreen('gameBoard');
@@ -948,25 +948,25 @@ class EventManager {
       BoardRenderer.render(data.board);
       UIManager.updateGameInfo();
       UIManager.updateBackgroundColor();
-      
+
       elements.whitePlayerInfo.querySelector('span').textContent = `백: ${data.whitePlayer}`;
       elements.blackPlayerInfo.querySelector('span').textContent = `흑: ${data.blackPlayer}`;
-      
+
       if (gameState.myTurn) {
         UIManager.showNotification('게임이 시작되었습니다. 당신의 턴입니다.');
       } else {
         UIManager.showNotification('게임이 시작되었습니다. 상대방의 턴을 기다리세요.');
       }
     });
-    
+
     socket.on('boardUpdate', (data) => {
       // 턴 정보를 먼저 업데이트
       gameState.currentTurn = data.turn;
       gameState.myTurn = gameState.playerColor === data.turn;
-      
+
       // 보드 렌더링 (이때 올바른 턴 정보로 UI 업데이트됨)
       BoardRenderer.render(data.board);
-      
+
       if (data.moveDetails) {
         // 서버에서 캐슬링 정보를 보낸 경우
         if (data.moveDetails.castling) {
@@ -975,13 +975,13 @@ class EventManager {
           } else if (data.moveDetails.castling === 'queenside') {
             audioManager.play('queen-castling');
           }
-        } 
+        }
         // 서버에서 캐슬링 정보를 안 보낸 경우 클라이언트에서 감지
         else if (data.moveDetails.from && data.moveDetails.to) {
           const [fromRow, fromCol] = data.moveDetails.from;
           const [toRow, toCol] = data.moveDetails.to;
           const piece = data.moveDetails.piece;
-          
+
           const castlingType = AudioManager.detectCastling(fromRow, fromCol, toRow, toCol, piece);
           if (castlingType) {
             if (castlingType === 'kingside') {
@@ -998,7 +998,7 @@ class EventManager {
           audioManager.play(data.moveDetails.capture ? 'capture' : 'move');
         }
       }
-      
+
       if (data.status === 'checkmate') {
         elements.gameStatusEl.textContent = '체크메이트!';
         elements.restartBtn.style.display = 'block';
@@ -1006,72 +1006,72 @@ class EventManager {
         UIManager.showNotification('당신의 턴입니다.');
       }
     });
-    
+
     socket.on('check', (data) => {
       audioManager.play('check');
       elements.gameStatusEl.textContent = '체크!';
       elements.gameStatusEl.className = 'check-status';
       UIManager.showNotification('체크!');
     });
-    
+
     socket.on('gameOver', (data) => {
       UIManager.showNotification(`게임 종료: ${data.message}`);
       audioManager.play('checkmate');
       gameState.myTurn = false;
-      
+
       elements.gameStatusEl.textContent = `게임 종료: ${data.message}`;
       elements.gameStatusEl.className = data.winner === gameState.playerColor ? 'win-status' : 'lose-status';
       elements.restartBtn.style.display = 'block';
     });
-    
+
     socket.on('gameRestarted', (data) => {
       // 턴 정보를 먼저 업데이트
       gameState.currentTurn = data.turn;
       gameState.myTurn = gameState.playerColor === data.turn;
-      
+
       // 보드 렌더링 (이때 올바른 턴 정보로 UI 업데이트됨)
       BoardRenderer.render(data.board);
-      
+
       elements.gameStatusEl.textContent = '';
       elements.gameStatusEl.className = '';
       elements.restartBtn.style.display = 'none';
-      
+
       UIManager.showNotification('게임이 재시작되었습니다.');
     });
-    
+
     socket.on('playerDisconnected', () => {
       UIManager.showNotification('상대방이 게임에서 나갔습니다.');
       gameState.myTurn = false;
       elements.restartBtn.style.display = 'none';
-      
+
       setTimeout(() => RoomManager.backToLobby(), 3000);
     });
-    
+
     socket.on('playerLeft', () => {
       UIManager.showNotification('상대방이 게임에서 나갔습니다.');
       gameState.myTurn = false;
       elements.restartBtn.style.display = 'none';
-      
+
       setTimeout(() => RoomManager.backToLobby(), 3000);
     });
-    
+
     socket.on('becomeHost', (data) => {
       gameState.playerColor = data.color;
       RoomManager.backToLobby();
       UIManager.showNotification(data.message);
     });
-    
+
     socket.on('waitingForPlayer', (data) => {
       UIManager.showScreen('gameSetup');
       elements.roomInfo.textContent = `방 아이디: ${gameState.currentRoom}`;
       elements.waitingMsg.textContent = data.message;
       UIManager.showNotification(data.message);
     });
-    
+
     socket.on('error', (message) => {
       UIManager.showNotification(message);
     });
-    
+
     // 채팅 메시지 수신
     socket.on('chatMessage', (messageData) => {
       ChatManager.addMessage(messageData);
@@ -1082,23 +1082,23 @@ class EventManager {
       gameState.currentRoom = data.roomId;
       gameState.isSpectating = true;
       gameState.currentTurn = data.turn;
-      
+
       UIManager.showScreen('spectateGame');
       BoardRenderer.renderSpectateBoard(data.board);
-      
+
       // 게임 정보 업데이트
       elements.spectateGameInfo.textContent = `방 ID: ${data.roomId}`;
       elements.spectateCurrentTurn.textContent = `현재 턴: ${data.turn === 'white' ? '백' : '흑'}`;
       elements.spectateWhitePlayerInfo.querySelector('span').textContent = `백: ${data.whitePlayer}`;
       elements.spectateBlackPlayerInfo.querySelector('span').textContent = `흑: ${data.blackPlayer}`;
-      
+
       // 관전자 채팅 히스토리 로드
       if (data.spectatorChatHistory) {
         SpectatorChatManager.loadChatHistory(data.spectatorChatHistory);
       } else {
         SpectatorChatManager.clearChat();
       }
-      
+
       UIManager.showNotification(`${data.whitePlayer} vs ${data.blackPlayer} 게임을 관전합니다.`);
     });
 
@@ -1129,7 +1129,7 @@ class EventManager {
         gameState.currentTurn = data.turn;
         BoardRenderer.renderSpectateBoard(data.board);
         elements.spectateCurrentTurn.textContent = `현재 턴: ${data.turn === 'white' ? '백' : '흑'}`;
-        
+
         // 관전자도 이동 소리 재생
         if (data.moveDetails) {
           if (data.moveDetails.castling) {
@@ -1142,7 +1142,7 @@ class EventManager {
             const [fromRow, fromCol] = data.moveDetails.from;
             const [toRow, toCol] = data.moveDetails.to;
             const piece = data.moveDetails.piece;
-            
+
             const castlingType = AudioManager.detectCastling(fromRow, fromCol, toRow, toCol, piece);
             if (castlingType) {
               if (castlingType === 'kingside') {
@@ -1173,6 +1173,13 @@ class EventManager {
       if (gameState.isSpectating) {
         SpectatorChatManager.addMessage(messageData);
       }
+    });
+
+    // 업적 획득 알림
+    socket.on('achievementsEarned', (achievements) => {
+      achievements.forEach(achievement => {
+        UIManager.showNotification(`🏆 새로운 업적: ${achievement.name}`);
+      });
     });
   }
 
@@ -1214,11 +1221,11 @@ function debugGameState() {
 // 초기화
 function init() {
   console.log('게임 초기화 시작');
-  
+
   initializeUser();
 
   const audioManager = new AudioManager();
-  
+
   EventManager.init();
   setupNavigation();
 
@@ -1235,7 +1242,7 @@ function setupNavigation() {
   document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
       const href = link.getAttribute('href');
-      
+
       if (href === '#lobby') {
         e.preventDefault();
         UIManager.showScreen('lobby');
@@ -1266,7 +1273,7 @@ async function initializeUser() {
       gameState.playerName = authData.user.nickname;
       elements.playerNameInput.value = authData.user.nickname;
       elements.playerNameInput.readOnly = true;
-      
+
       // 관전자 이름도 기본값으로 설정
       if (elements.spectatorNameInput) {
         elements.spectatorNameInput.value = authData.user.nickname;
