@@ -291,15 +291,21 @@ class UIManager {
 // 방 관리 클래스
 class RoomManager {
   static createRoom() {
-    // gameState.playerName은 initializeUser에서 설정됨
+    const playerName = elements.playerNameInput.value.trim();
     const roomId = elements.roomIdInput.value.trim();
+
+    if (!playerName) {
+      UIManager.showNotification('플레이어 이름이 필요합니다. 로그인 상태를 확인해주세요.');
+      return;
+    }
 
     if (!roomId) {
       UIManager.showNotification('방 아이디를 입력해주세요.');
       return;
     }
 
-    socket.emit('createRoom', { roomId, playerName: gameState.playerName });
+    gameState.playerName = playerName;
+    socket.emit('createRoom', { roomId, playerName: playerName });
   }
 
   static joinRoom(roomId) {
@@ -899,9 +905,7 @@ class EventManager {
     socket.on('roomList', UIManager.displayRoomList);
     socket.on('spectateList', UIManager.displaySpectateList);
 
-    socket.on('roomListUpdated', () => {
-      RoomManager.getRoomList();
-    });
+    
 
     socket.on('spectateListUpdated', () => {
       SpectateManager.getSpectateList();
