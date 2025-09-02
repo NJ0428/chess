@@ -851,3 +851,78 @@ section {
     max-width: 300px;
   }
 }
+
+/*=====================================================
+    LOGIN & REGISTER PAGE
+=====================================================*/
+.login-main {
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 120px 0 60px;
+}
+
+.auth-container {
+  max-width: 900px; /* Increased max-width */
+  width: 100%;
+  margin: 0 auto;
+  background: var(--bg-secondary);
+  padding: 0; /* Removed padding */
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 10px 30px var(--shadow-color);
+  display: flex; /* Added flex display */
+  overflow: hidden; /* Ensure child elements conform to border radius */
+}
+
+.auth-image-section {
+  flex: 1; /* Take up half the space */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-card);
+}
+
+.auth-image-section img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.auth-form-section {
+  flex: 1; /* Take up the other half */
+  padding: 40px;
+}
+
+.auth-form .section-header {
+  margin-bottom: 30px;
+}
+
+.auth-form .section-header h2 {
+  font-size: 2rem;
+}
+
+.toggle-form {
+  text-align: center;
+  margin-top: 25px;
+}
+
+.toggle-form a {
+  color: var(--primary-light);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.toggle-form a:hover {
+  text-decoration: underline;
+}
+
+.form-group label i {
+  margin-right: 8px;
+  color: var(--primary-light);
+}
+
+.btn i {
+  font-size: 1.1em;
+}
