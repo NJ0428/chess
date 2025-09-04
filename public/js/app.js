@@ -870,7 +870,7 @@ class EventManager {
     // 버튼 이벤트
     elements.createRoomBtn.addEventListener('click', RoomManager.createRoom);
     elements.refreshRoomListBtn.addEventListener('click', RoomManager.getRoomList);
-    elements.backToLobbyBtn.addEventListener('click', RoomManager.backToLobby);
+    elements.backToLobbyBtn.addEventListener('click', RoomManager.leaveRoom); // 대기실에서 나갈 때 방을 떠나도록 수정
     elements.restartBtn.addEventListener('click', GameLogic.restartGame);
     elements.leaveGameBtn.addEventListener('click', RoomManager.leaveRoom);
 
