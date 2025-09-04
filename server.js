@@ -247,8 +247,6 @@ app.get('/api/stats/achievements', async (req, res) => {
   }
 });
 
-let rooms = {};
-
 // 체스 게임 클래스
 class ChessGame {
   constructor() {
