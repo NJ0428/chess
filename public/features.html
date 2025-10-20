@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>기능 - NAK 체스 게임</title>
+  <meta name="description" content="NAK 체스의 다양한 기능을 확인해보세요. 실시간 멀티플레이, 간편한 방 시스템, 완벽한 체스 규칙 구현 등을 제공합니다.">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="main.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Skip to Content -->
+  <a href="#main-content" class="skip-to-content">메인 컨텐츠로 이동</a>
+
+  <header id="header" class="header" role="banner">
+    <div class="container">
+      <div class="logo">
+        <h1><a href="index.html"><i class="fas fa-chess-king" aria-hidden="true"></i> NAK 체스</a></h1>
+      </div>
+      <nav class="nav" role="navigation" aria-label="메인 네비게이션">
+        <ul class="nav-list" id="nav-list">
+          <li><a href="index.html" class="nav-link">홈</a></li>
+          <li><a href="features.html" class="nav-link active">기능</a></li>
+          <li><a href="how-to-play.html" class="nav-link">게임 방법</a></li>
+          <li><a href="chess-rules.html" class="nav-link">체스 규칙</a></li>
+          <li><a href="leaderboard.html" class="nav-link">리더보드</a></li>
+          <li><a href="stats.html" class="nav-link">통계</a></li>
+        </ul>
+      </nav>
+      <div class="header-actions">
+        <!-- Dark Mode Toggle -->
+        <button id="dark-mode-toggle" class="icon-btn" aria-label="다크모드 전환" title="다크모드 전환">
+          <i class="fas fa-moon"></i>
+        </button>
+
+        <!-- Auth Links / Profile -->
+        <div id="auth-links" class="auth-links">
+          <a href="login.html" class="btn btn-sm btn-outline">로그인</a>
+          <a href="game.html" class="btn btn-sm btn-primary">게임 시작</a>
+        </div>
+      </div>
+      <div class="mobile-nav-toggle" id="mobile-nav-toggle" aria-label="모바일 메뉴 토글">
+        <i class="fas fa-bars"></i>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <!-- Page Hero -->
+    <section class="page-hero">
+      <div class="container">
+        <div class="page-hero-content reveal">
+          <h1><i class="fas fa-star"></i> NAK 체스의 주요 기능</h1>
+          <p>최고의 온라인 체스 경험을 위한 강력한 기능들을 만나보세요</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-page">
+      <div class="container">
+        <div class="features-grid">
+          <!-- Feature 1 -->
+          <div class="feature-card-detailed reveal">
+            <div class="feature-icon-large">
+              <i class="fas fa-bolt" aria-hidden="true"></i>
+            </div>
+            <h2>실시간 멀티플레이</h2>
+            <p class="feature-description">Socket.IO 기반의 지연 없는 실시간 대전으로 박진감 넘치는 게임을 즐기세요. 빠른 응답 속도와 안정적인 연결로 끊김 없는 게임 경험을 제공합니다.</p>
+            <ul class="feature-benefits">
+              <li><i class="fas fa-check"></i> 초저지연 실시간 통신</li>
+              <li><i class="fas fa-check"></i> 자동 재연결 기능</li>
+              <li><i class="fas fa-check"></i> 전 세계 플레이어와 대결</li>
+            </ul>
+          </div>
+
+          <!-- Feature 2 -->
+          <div class="feature-card-detailed reveal">
+            <div class="feature-icon-large">
+              <i class="fas fa-users" aria-hidden="true"></i>
+            </div>
+            <h2>간편한 방 시스템</h2>
+            <p class="feature-description">친구와 함께 플레이할 수 있는 비공개 방을 쉽게 만들고 참가할 수 있습니다. 방 코드를 공유하여 원하는 사람과만 게임을 즐기세요.</p>
+            <ul class="feature-benefits">
+              <li><i class="fas fa-check"></i> 빠른 방 생성 및 참가</li>
+              <li><i class="fas fa-check"></i> 비공개/공개 방 설정</li>
+              <li><i class="fas fa-check"></i> 방 목록 실시간 업데이트</li>
+            </ul>
+          </div>
+
+          <!-- Feature 3 -->
+          <div class="feature-card-detailed reveal">
+            <div class="feature-icon-large">
+              <i class="fas fa-chess" aria-hidden="true"></i>
+            </div>
+            <h2>완벽한 체스 규칙</h2>
+            <p class="feature-description">캐슬링, 앙파상, 프로모션 등 모든 공식 체스 규칙이 완벽하게 구현되었습니다. FIDE 규정을 철저히 준수합니다.</p>
+            <ul class="feature-benefits">
+              <li><i class="fas fa-check"></i> 모든 특수 이동 지원</li>
+              <li><i class="fas fa-check"></i> 체크/체크메이트 자동 감지</li>
+              <li><i class="fas fa-check"></i> 스테일메이트 판정</li>
+            </ul>
+          </div>
+
+          <!-- Feature 4 -->
+          <div class="feature-card-detailed reveal">
+            <div class="feature-icon-large">
+              <i class="fas fa-mobile-alt" aria-hidden="true"></i>
+            </div>
+            <h2>반응형 디자인</h2>
+            <p class="feature-description">데스크탑, 태블릿, 모바일 등 모든 기기에서 완벽한 플레이 경험을 제공합니다. 언제 어디서나 최적화된 화면으로 체스를 즐기세요.</p>
+            <ul class="feature-benefits">
+              <li><i class="fas fa-check"></i> 모든 화면 크기 지원</li>
+              <li><i class="fas fa-check"></i> 터치 인터페이스 최적화</li>
+              <li><i class="fas fa-check"></i> 고해상도 디스플레이 지원</li>
+            </ul>
+          </div>
+
+          <!-- Feature 5 -->
+          <div class="feature-card-detailed reveal">
+            <div class="feature-icon-large">
+              <i class="fas fa-history" aria-hidden="true"></i>
+            </div>
+            <h2>게임 기록 & 리플레이</h2>
+            <p class="feature-description">모든 게임이 자동으로 저장되며, 언제든지 다시 볼 수 있습니다. 실수를 분석하고 실력을 향상시키세요.</p>
+            <ul class="feature-benefits">
+              <li><i class="fas fa-check"></i> 전체 게임 히스토리 저장</li>
+              <li><i class="fas fa-check"></i> 수 단위 리플레이 기능</li>
+              <li><i class="fas fa-check"></i> PGN 형식 내보내기</li>
+            </ul>
+          </div>
+
+          <!-- Feature 6 -->
+          <div class="feature-card-detailed reveal">
+            <div class="feature-icon-large">
+              <i class="fas fa-chart-line" aria-hidden="true"></i>
+            </div>
+            <h2>랭킹 시스템</h2>
+            <p class="feature-description">ELO 레이팅 시스템으로 당신의 실력을 추적하고, 전 세계 플레이어들과 경쟁하세요. 공정한 매칭 시스템을 제공합니다.</p>
+            <ul class="feature-benefits">
+              <li><i class="fas fa-check"></i> 표준 ELO 레이팅 시스템</li>
+              <li><i class="fas fa-check"></i> 실시간 랭킹 업데이트</li>
+              <li><i class="fas fa-check"></i> 상세한 통계 제공</li>
+            </ul>
+          </div>
+
+          <!-- Feature 7 -->
+          <div class="feature-card-detailed reveal">
+            <div class="feature-icon-large">
+              <i class="fas fa-clock" aria-hidden="true"></i>
+            </div>
+            <h2>시간 제한 모드</h2>
+            <p class="feature-description">블리츠, 래피드, 클래식 등 다양한 시간 제한 모드로 긴장감 넘치는 게임을 즐기세요. 각 모드별 별도의 레이팅을 관리합니다.</p>
+            <ul class="feature-benefits">
+              <li><i class="fas fa-check"></i> 블리츠 (3+0, 5+0)</li>
+              <li><i class="fas fa-check"></i> 래피드 (10+0, 15+10)</li>
+              <li><i class="fas fa-check"></i> 클래식 (30+0 이상)</li>
+            </ul>
+          </div>
+
+          <!-- Feature 8 -->
+          <div class="feature-card-detailed reveal">
+            <div class="feature-icon-large">
+              <i class="fas fa-robot" aria-hidden="true"></i>
+            </div>
+            <h2>AI 연습 모드</h2>
+            <p class="feature-description">다양한 난이도의 AI와 연습하여 실력을 향상시키고, 새로운 전략을 시험해보세요. 초보자부터 상급자까지 맞춤형 연습이 가능합니다.</p>
+            <ul class="feature-benefits">
+              <li><i class="fas fa-check"></i> 5단계 난이도 조절</li>
+              <li><i class="fas fa-check"></i> AI 분석 및 힌트 제공</li>
+              <li><i class="fas fa-check"></i> 오프라인 플레이 지원</li>
+            </ul>
+          </div>
+
+          <!-- Feature 9 -->
+          <div class="feature-card-detailed reveal">
+            <div class="feature-icon-large">
+              <i class="fas fa-comments" aria-hidden="true"></i>
+            </div>
+            <h2>실시간 채팅</h2>
+            <p class="feature-description">게임 중 상대방과 대화하고, 게임이 끝난 후 분석을 함께 나눌 수 있습니다. 건전한 커뮤니티 문화를 만들어갑니다.</p>
+            <ul class="feature-benefits">
+              <li><i class="fas fa-check"></i> 실시간 메시지 전송</li>
+              <li><i class="fas fa-check"></i> 이모티콘 지원</li>
+              <li><i class="fas fa-check"></i> 부적절한 메시지 필터링</li>
+            </ul>
+          </div>
+
+          <!-- Feature 10 -->
+          <div class="feature-card-detailed reveal">
+            <div class="feature-icon-large">
+              <i class="fas fa-moon" aria-hidden="true"></i>
+            </div>
+            <h2>다크 모드</h2>
+            <p class="feature-description">눈의 피로를 줄이고 밤에도 편안하게 게임을 즐길 수 있는 다크 모드를 지원합니다. 자동 또는 수동으로 테마를 전환할 수 있습니다.</p>
+            <ul class="feature-benefits">
+              <li><i class="fas fa-check"></i> 원클릭 테마 전환</li>
+              <li><i class="fas fa-check"></i> 시스템 설정 연동</li>
+              <li><i class="fas fa-check"></i> 눈의 피로 감소</li>
+            </ul>
+          </div>
+
+          <!-- Feature 11 -->
+          <div class="feature-card-detailed reveal">
+            <div class="feature-icon-large">
+              <i class="fas fa-bell" aria-hidden="true"></i>
+            </div>
+            <h2>알림 시스템</h2>
+            <p class="feature-description">중요한 게임 이벤트와 업데이트를 실시간으로 알려드립니다. 친구의 게임 초대, 턴 알림 등을 놓치지 마세요.</p>
+            <ul class="feature-benefits">
+              <li><i class="fas fa-check"></i> 실시간 푸시 알림</li>
+              <li><i class="fas fa-check"></i> 맞춤형 알림 설정</li>
+              <li><i class="fas fa-check"></i> 알림 히스토리 관리</li>
+            </ul>
+          </div>
+
+          <!-- Feature 12 -->
+          <div class="feature-card-detailed reveal">
+            <div class="feature-icon-large">
+              <i class="fas fa-universal-access" aria-hidden="true"></i>
+            </div>
+            <h2>접근성 지원</h2>
+            <p class="feature-description">모든 사용자가 쉽게 게임을 즐길 수 있도록 웹 접근성을 고려하여 설계되었습니다. 키보드 내비게이션, 스크린 리더 지원 등을 제공합니다.</p>
+            <ul class="feature-benefits">
+              <li><i class="fas fa-check"></i> 키보드 전용 조작 가능</li>
+              <li><i class="fas fa-check"></i> 스크린 리더 최적화</li>
+              <li><i class="fas fa-check"></i> 고대비 모드 지원</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- CTA Section -->
+        <div class="features-cta reveal">
+          <h2>지금 바로 NAK 체스를 시작하세요!</h2>
+          <p>모든 기능을 무료로 이용할 수 있습니다</p>
+          <div class="cta-buttons">
+            <a href="game.html" class="btn btn-primary btn-lg">
+              <i class="fas fa-play"></i> 게임 시작하기
+            </a>
+            <a href="how-to-play.html" class="btn btn-outline btn-lg">
+              <i class="fas fa-book"></i> 게임 방법 알아보기
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-text">
+          <p>&copy; <span id="current-year"></span> NAK 체스. All Rights Reserved.</p>
+          <p class="version">Version 1.0.0</p>
+        </div>
+        <div class="footer-social">
+          <a href="https://github.com/nakchess" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
+            <i class="fab fa-github" aria-hidden="true"></i>
+          </a>
+          <a href="https://linkedin.com/company/nakchess" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+            <i class="fab fa-linkedin" aria-hidden="true"></i>
+          </a>
+          <a href="https://twitter.com/nakchess" target="_blank" rel="noopener noreferrer" aria-label="Twitter">
+            <i class="fab fa-twitter" aria-hidden="true"></i>
+          </a>
+          <a href="https://discord.gg/nakchess" target="_blank" rel="noopener noreferrer" aria-label="Discord">
+            <i class="fab fa-discord" aria-hidden="true"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+  <script>
+    // Set current year
+    document.getElementById('current-year').textContent = new Date().getFullYear();
+
+    // Reveal on scroll
+    const revealElements = document.querySelectorAll('.reveal');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+
+    revealElements.forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>
