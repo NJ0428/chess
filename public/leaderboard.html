@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>리더보드 - NAK 체스 게임</title>
+  <meta name="description" content="NAK 체스 리더보드에서 최고의 플레이어들을 확인하세요. 일간, 주간, 전체 랭킹과 상세 통계를 제공합니다.">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="main.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Skip to Content -->
+  <a href="#main-content" class="skip-to-content">메인 컨텐츠로 이동</a>
+
+  <header id="header" class="header" role="banner">
+    <div class="container">
+      <div class="logo">
+        <h1><a href="index.html"><i class="fas fa-chess-king" aria-hidden="true"></i> NAK 체스</a></h1>
+      </div>
+      <nav class="nav" role="navigation" aria-label="메인 네비게이션">
+        <ul class="nav-list" id="nav-list">
+          <li><a href="index.html" class="nav-link">홈</a></li>
+          <li><a href="features.html" class="nav-link">기능</a></li>
+          <li><a href="how-to-play.html" class="nav-link">게임 방법</a></li>
+          <li><a href="chess-rules.html" class="nav-link">체스 규칙</a></li>
+          <li><a href="leaderboard.html" class="nav-link active">리더보드</a></li>
+          <li><a href="stats.html" class="nav-link">통계</a></li>
+        </ul>
+      </nav>
+      <div class="header-actions">
+        <!-- Dark Mode Toggle -->
+        <button id="dark-mode-toggle" class="icon-btn" aria-label="다크모드 전환" title="다크모드 전환">
+          <i class="fas fa-moon"></i>
+        </button>
+
+        <!-- Auth Links / Profile -->
+        <div id="auth-links" class="auth-links">
+          <a href="login.html" class="btn btn-sm btn-outline">로그인</a>
+          <a href="game.html" class="btn btn-sm btn-primary">게임 시작</a>
+        </div>
+      </div>
+      <div class="mobile-nav-toggle" id="mobile-nav-toggle" aria-label="모바일 메뉴 토글">
+        <i class="fas fa-bars"></i>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <!-- Page Hero -->
+    <section class="page-hero">
+      <div class="container">
+        <div class="page-hero-content reveal">
+          <h1><i class="fas fa-trophy"></i> 리더보드</h1>
+          <p>최고의 체스 마스터들과 경쟁하세요</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Leaderboard Page -->
+    <section class="leaderboard-page">
+      <div class="container">
+        <!-- Time Period Selector -->
+        <div class="leaderboard-controls reveal">
+          <div class="period-tabs">
+            <button class="period-tab active" data-period="daily">
+              <i class="fas fa-calendar-day"></i>
+              <span>일간</span>
+            </button>
+            <button class="period-tab" data-period="weekly">
+              <i class="fas fa-calendar-week"></i>
+              <span>주간</span>
+            </button>
+            <button class="period-tab" data-period="monthly">
+              <i class="fas fa-calendar-alt"></i>
+              <span>월간</span>
+            </button>
+            <button class="period-tab" data-period="all-time">
+              <i class="fas fa-infinity"></i>
+              <span>전체</span>
+            </button>
+          </div>
+
+          <div class="leaderboard-filters">
+            <select id="gameTypeFilter" class="filter-select">
+              <option value="all">모든 게임</option>
+              <option value="blitz">블리츠</option>
+              <option value="rapid">래피드</option>
+              <option value="classic">클래식</option>
+            </select>
+
+            <button id="refreshLeaderboard" class="btn btn-outline btn-sm">
+              <i class="fas fa-sync-alt"></i> 새로고침
+            </button>
+          </div>
+        </div>
+
+        <!-- Top 3 Podium -->
+        <div class="podium-section reveal">
+          <div class="podium">
+            <!-- 2nd Place -->
+            <div class="podium-place second-place" id="podium-2">
+              <div class="podium-rank">2</div>
+              <div class="podium-avatar">
+                <i class="fas fa-user"></i>
+              </div>
+              <div class="podium-info">
+                <h3 class="podium-name">Loading...</h3>
+                <div class="podium-rating">
+                  <i class="fas fa-star"></i>
+                  <span>0</span>
+                </div>
+                <div class="podium-stats">
+                  <span class="win-rate">0%</span>
+                </div>
+              </div>
+              <div class="podium-base silver">
+                <i class="fas fa-medal"></i>
+              </div>
+            </div>
+
+            <!-- 1st Place -->
+            <div class="podium-place first-place" id="podium-1">
+              <div class="podium-rank">1</div>
+              <div class="crown">
+                <i class="fas fa-crown"></i>
+              </div>
+              <div class="podium-avatar champion">
+                <i class="fas fa-user"></i>
+              </div>
+              <div class="podium-info">
+                <h3 class="podium-name">Loading...</h3>
+                <div class="podium-rating">
+                  <i class="fas fa-star"></i>
+                  <span>0</span>
+                </div>
+                <div class="podium-stats">
+                  <span class="win-rate">0%</span>
+                </div>
+              </div>
+              <div class="podium-base gold">
+                <i class="fas fa-trophy"></i>
+              </div>
+            </div>
+
+            <!-- 3rd Place -->
+            <div class="podium-place third-place" id="podium-3">
+              <div class="podium-rank">3</div>
+              <div class="podium-avatar">
+                <i class="fas fa-user"></i>
+              </div>
+              <div class="podium-info">
+                <h3 class="podium-name">Loading...</h3>
+                <div class="podium-rating">
+                  <i class="fas fa-star"></i>
+                  <span>0</span>
+                </div>
+                <div class="podium-stats">
+                  <span class="win-rate">0%</span>
+                </div>
+              </div>
+              <div class="podium-base bronze">
+                <i class="fas fa-medal"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Full Leaderboard Table -->
+        <div class="leaderboard-table-section reveal">
+          <div class="table-header">
+            <h2><i class="fas fa-list-ol"></i> 전체 랭킹</h2>
+            <div class="table-info">
+              <span id="totalPlayers">총 플레이어: 0명</span>
+            </div>
+          </div>
+
+          <div class="leaderboard-table-wrapper">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th class="rank-col">순위</th>
+                  <th class="player-col">플레이어</th>
+                  <th class="rating-col sortable" data-sort="rating">
+                    레이팅 <i class="fas fa-sort"></i>
+                  </th>
+                  <th class="games-col sortable" data-sort="games">
+                    게임 수 <i class="fas fa-sort"></i>
+                  </th>
+                  <th class="record-col">승/무/패</th>
+                  <th class="winrate-col sortable" data-sort="winrate">
+                    승률 <i class="fas fa-sort"></i>
+                  </th>
+                  <th class="streak-col">연승</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboard-tbody">
+                <tr>
+                  <td colspan="7" class="loading-row">
+                    <div class="spinner"></div>
+                    <span>리더보드를 불러오는 중...</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="pagination" id="pagination">
+            <button class="page-btn" id="prevPage" disabled>
+              <i class="fas fa-chevron-left"></i> 이전
+            </button>
+            <div class="page-numbers" id="pageNumbers">
+              <!-- 동적 생성 -->
+            </div>
+            <button class="page-btn" id="nextPage">
+              다음 <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Stats Summary -->
+        <div class="stats-summary reveal">
+          <h2>리더보드 통계</h2>
+          <div class="summary-grid">
+            <div class="summary-card">
+              <i class="fas fa-chart-line"></i>
+              <div class="summary-value" id="avgRating">0</div>
+              <div class="summary-label">평균 레이팅</div>
+            </div>
+            <div class="summary-card">
+              <i class="fas fa-chess"></i>
+              <div class="summary-value" id="totalGames">0</div>
+              <div class="summary-label">총 게임 수</div>
+            </div>
+            <div class="summary-card">
+              <i class="fas fa-users"></i>
+              <div class="summary-value" id="activePlayers">0</div>
+              <div class="summary-label">활성 플레이어</div>
+            </div>
+            <div class="summary-card">
+              <i class="fas fa-fire"></i>
+              <div class="summary-value" id="longestStreak">0</div>
+              <div class="summary-label">최장 연승</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rating Distribution Chart -->
+        <div class="rating-distribution reveal">
+          <h2>레이팅 분포</h2>
+          <div class="chart-container">
+            <div class="rating-bar" data-range="0-1000">
+              <div class="bar-label">0-1000</div>
+              <div class="bar-fill" style="width: 0%"></div>
+              <div class="bar-value">0명</div>
+            </div>
+            <div class="rating-bar" data-range="1000-1200">
+              <div class="bar-label">1000-1200</div>
+              <div class="bar-fill" style="width: 0%"></div>
+              <div class="bar-value">0명</div>
+            </div>
+            <div class="rating-bar" data-range="1200-1400">
+              <div class="bar-label">1200-1400</div>
+              <div class="bar-fill" style="width: 0%"></div>
+              <div class="bar-value">0명</div>
+            </div>
+            <div class="rating-bar" data-range="1400-1600">
+              <div class="bar-label">1400-1600</div>
+              <div class="bar-fill" style="width: 0%"></div>
+              <div class="bar-value">0명</div>
+            </div>
+            <div class="rating-bar" data-range="1600-1800">
+              <div class="bar-label">1600-1800</div>
+              <div class="bar-fill" style="width: 0%"></div>
+              <div class="bar-value">0명</div>
+            </div>
+            <div class="rating-bar" data-range="1800-2000">
+              <div class="bar-label">1800-2000</div>
+              <div class="bar-fill" style="width: 0%"></div>
+              <div class="bar-value">0명</div>
+            </div>
+            <div class="rating-bar" data-range="2000+">
+              <div class="bar-label">2000+</div>
+              <div class="bar-fill" style="width: 0%"></div>
+              <div class="bar-value">0명</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CTA Section -->
+        <div class="leaderboard-cta reveal">
+          <h2>당신도 리더보드에 도전하세요!</h2>
+          <p>게임을 시작하고 레이팅을 쌓아 최고의 플레이어가 되어보세요</p>
+          <div class="cta-buttons">
+            <a href="game.html" class="btn btn-primary btn-lg">
+              <i class="fas fa-play"></i> 게임 시작하기
+            </a>
+            <a href="stats.html" class="btn btn-outline btn-lg">
+              <i class="fas fa-chart-bar"></i> 내 통계 보기
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-text">
+          <p>&copy; <span id="current-year"></span> NAK 체스. All Rights Reserved.</p>
+          <p class="version">Version 1.0.0</p>
+        </div>
+        <div class="footer-social">
+          <a href="https://github.com/nakchess" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
+            <i class="fab fa-github" aria-hidden="true"></i>
+          </a>
+          <a href="https://linkedin.com/company/nakchess" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+            <i class="fab fa-linkedin" aria-hidden="true"></i>
+          </a>
+          <a href="https://twitter.com/nakchess" target="_blank" rel="noopener noreferrer" aria-label="Twitter">
+            <i class="fab fa-twitter" aria-hidden="true"></i>
+          </a>
+          <a href="https://discord.gg/nakchess" target="_blank" rel="noopener noreferrer" aria-label="Discord">
+            <i class="fab fa-discord" aria-hidden="true"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+  <script>
+    // Set current year
+    document.getElementById('current-year').textContent = new Date().getFullYear();
+
+    // Reveal on scroll
+    const revealElements = document.querySelectorAll('.reveal');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+
+    revealElements.forEach(el => observer.observe(el));
+
+    // Leaderboard functionality
+    let currentPeriod = 'daily';
+    let currentGameType = 'all';
+    let currentPage = 1;
+    const playersPerPage = 50;
+
+    // Sample data (실제로는 서버에서 가져와야 함)
+    function generateSampleData(count) {
+      const names = ['김체스', '이마스터', '박그랜드', '최킹', '정퀸', '강룩', '조비숍', '윤나이트', '임폰', '한캐슬'];
+      const data = [];
+
+      for (let i = 0; i < count; i++) {
+        const wins = Math.floor(Math.random() * 100) + 50;
+        const losses = Math.floor(Math.random() * 50) + 10;
+        const draws = Math.floor(Math.random() * 20);
+        const total = wins + losses + draws;
+        const winRate = ((wins / total) * 100).toFixed(1);
+
+        data.push({
+          rank: i + 1,
+          name: names[Math.floor(Math.random() * names.length)] + (i + 1),
+          rating: 2200 - (i * 10) + Math.floor(Math.random() * 20),
+          games: total,
+          wins: wins,
+          draws: draws,
+          losses: losses,
+          winRate: winRate,
+          streak: Math.floor(Math.random() * 10)
+        });
+      }
+
+      return data;
+    }
+
+    // Load leaderboard data
+    function loadLeaderboard() {
+      const tbody = document.getElementById('leaderboard-tbody');
+      tbody.innerHTML = '<tr><td colspan="7" class="loading-row"><div class="spinner"></div><span>리더보드를 불러오는 중...</span></td></tr>';
+
+      // 실제 구현에서는 서버에서 데이터를 가져와야 합니다
+      setTimeout(() => {
+        const data = generateSampleData(200);
+        displayLeaderboard(data);
+        updatePodium(data.slice(0, 3));
+        updateStats(data);
+        updateRatingDistribution(data);
+      }, 500);
+    }
+
+    // Display leaderboard table
+    function displayLeaderboard(data) {
+      const tbody = document.getElementById('leaderboard-tbody');
+      const start = (currentPage - 1) * playersPerPage;
+      const end = start + playersPerPage;
+      const pageData = data.slice(start, end);
+
+      if (pageData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-row">데이터가 없습니다</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = pageData.map(player => `
+        <tr>
+          <td class="rank-col">
+            ${player.rank <= 3 ? `<span class="medal-icon rank-${player.rank}"><i class="fas fa-medal"></i></span>` : ''}
+            <span class="rank-number">${player.rank}</span>
+          </td>
+          <td class="player-col">
+            <div class="player-info">
+              <div class="player-avatar">
+                <i class="fas fa-user"></i>
+              </div>
+              <span class="player-name">${player.name}</span>
+            </div>
+          </td>
+          <td class="rating-col">
+            <span class="rating-value">${player.rating}</span>
+          </td>
+          <td class="games-col">${player.games}</td>
+          <td class="record-col">
+            <span class="record-wins">${player.wins}</span> /
+            <span class="record-draws">${player.draws}</span> /
+            <span class="record-losses">${player.losses}</span>
+          </td>
+          <td class="winrate-col">
+            <div class="winrate-bar">
+              <div class="winrate-fill" style="width: ${player.winRate}%"></div>
+            </div>
+            <span class="winrate-text">${player.winRate}%</span>
+          </td>
+          <td class="streak-col">
+            ${player.streak > 0 ? `<span class="streak-badge"><i class="fas fa-fire"></i> ${player.streak}</span>` : '-'}
+          </td>
+        </tr>
+      `).join('');
+
+      updatePagination(data.length);
+      document.getElementById('totalPlayers').textContent = `총 플레이어: ${data.length}명`;
+    }
+
+    // Update podium
+    function updatePodium(topThree) {
+      topThree.forEach((player, index) => {
+        const position = index === 0 ? 1 : index === 1 ? 2 : 3;
+        const podium = document.getElementById(`podium-${position}`);
+
+        podium.querySelector('.podium-name').textContent = player.name;
+        podium.querySelector('.podium-rating span').textContent = player.rating;
+        podium.querySelector('.win-rate').textContent = `승률 ${player.winRate}%`;
+      });
+    }
+
+    // Update statistics
+    function updateStats(data) {
+      const avgRating = Math.floor(data.reduce((sum, p) => sum + p.rating, 0) / data.length);
+      const totalGames = data.reduce((sum, p) => sum + p.games, 0);
+      const activePlayers = data.filter(p => p.games > 10).length;
+      const longestStreak = Math.max(...data.map(p => p.streak));
+
+      document.getElementById('avgRating').textContent = avgRating;
+      document.getElementById('totalGames').textContent = totalGames.toLocaleString();
+      document.getElementById('activePlayers').textContent = activePlayers;
+      document.getElementById('longestStreak').textContent = longestStreak;
+    }
+
+    // Update rating distribution
+    function updateRatingDistribution(data) {
+      const ranges = {
+        '0-1000': 0,
+        '1000-1200': 0,
+        '1200-1400': 0,
+        '1400-1600': 0,
+        '1600-1800': 0,
+        '1800-2000': 0,
+        '2000+': 0
+      };
+
+      data.forEach(player => {
+        if (player.rating < 1000) ranges['0-1000']++;
+        else if (player.rating < 1200) ranges['1000-1200']++;
+        else if (player.rating < 1400) ranges['1200-1400']++;
+        else if (player.rating < 1600) ranges['1400-1600']++;
+        else if (player.rating < 1800) ranges['1600-1800']++;
+        else if (player.rating < 2000) ranges['1800-2000']++;
+        else ranges['2000+']++;
+      });
+
+      const maxCount = Math.max(...Object.values(ranges));
+
+      Object.entries(ranges).forEach(([range, count]) => {
+        const bar = document.querySelector(`.rating-bar[data-range="${range}"]`);
+        const percentage = maxCount > 0 ? (count / maxCount) * 100 : 0;
+        bar.querySelector('.bar-fill').style.width = `${percentage}%`;
+        bar.querySelector('.bar-value').textContent = `${count}명`;
+      });
+    }
+
+    // Update pagination
+    function updatePagination(totalPlayers) {
+      const totalPages = Math.ceil(totalPlayers / playersPerPage);
+      const pageNumbers = document.getElementById('pageNumbers');
+      const prevBtn = document.getElementById('prevPage');
+      const nextBtn = document.getElementById('nextPage');
+
+      prevBtn.disabled = currentPage === 1;
+      nextBtn.disabled = currentPage === totalPages;
+
+      pageNumbers.innerHTML = '';
+      for (let i = 1; i <= Math.min(totalPages, 10); i++) {
+        const btn = document.createElement('button');
+        btn.className = 'page-number' + (i === currentPage ? ' active' : '');
+        btn.textContent = i;
+        btn.onclick = () => {
+          currentPage = i;
+          loadLeaderboard();
+        };
+        pageNumbers.appendChild(btn);
+      }
+    }
+
+    // Event listeners
+    document.querySelectorAll('.period-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelector('.period-tab.active').classList.remove('active');
+        tab.classList.add('active');
+        currentPeriod = tab.dataset.period;
+        currentPage = 1;
+        loadLeaderboard();
+      });
+    });
+
+    document.getElementById('gameTypeFilter').addEventListener('change', (e) => {
+      currentGameType = e.target.value;
+      currentPage = 1;
+      loadLeaderboard();
+    });
+
+    document.getElementById('refreshLeaderboard').addEventListener('click', () => {
+      loadLeaderboard();
+    });
+
+    document.getElementById('prevPage').addEventListener('click', () => {
+      if (currentPage > 1) {
+        currentPage--;
+        loadLeaderboard();
+      }
+    });
+
+    document.getElementById('nextPage').addEventListener('click', () => {
+      currentPage++;
+      loadLeaderboard();
+    });
+
+    // Initial load
+    loadLeaderboard();
+  </script>
+</body>
+</html>
