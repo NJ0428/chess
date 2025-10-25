@@ -770,12 +770,24 @@ section {
     ANIMATIONS & RESPONSIVENESS
 =====================================================*/
 .reveal {
+  opacity: 1;
+  transform: translateY(0);
+  transition: all 1s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 애니메이션을 원하는 경우 이 클래스 사용 */
+.reveal-animated {
   opacity: 0;
   transform: translateY(50px);
   transition: all 1s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-.reveal.visible {
+.reveal-animated.visible {
   opacity: 1;
   transform: translateY(0);
 }
