@@ -14,6 +14,47 @@
   <link rel="stylesheet" href="main.css">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .tech-stack-section {
+      background-color: var(--bg-primary);
+      padding: 100px 0;
+    }
+    .tech-stack-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 30px;
+      margin-top: 60px;
+    }
+    .tech-item {
+      background: var(--bg-card);
+      padding: 30px;
+      border-radius: var(--border-radius-md);
+      border: 1px solid var(--border-color);
+      text-align: center;
+      transition: var(--transition-smooth);
+    }
+    .tech-item:hover {
+      transform: translateY(-5px);
+      border-color: var(--secondary-color);
+      box-shadow: 0 10px 25px rgba(255, 122, 89, 0.1);
+    }
+    .tech-item i {
+      font-size: 3rem;
+      color: var(--secondary-color);
+      margin-bottom: 20px;
+    }
+    .tech-item h3 {
+      font-size: 1.3rem;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+    }
+    .tech-item p {
+      color: var(--text-secondary);
+    }
+    .features-page {
+        background-color: var(--bg-secondary);
+    }
+  </style>
 </head>
 <body>
   <!-- Skip to Content -->
@@ -235,19 +276,65 @@
             </ul>
           </div>
         </div>
+      </div>
+    </section>
 
-        <!-- CTA Section -->
-        <div class="features-cta reveal">
-          <h2>지금 바로 NAK 체스를 시작하세요!</h2>
-          <p>모든 기능을 무료로 이용할 수 있습니다</p>
-          <div class="cta-buttons">
+    <!-- Technology Stack Section -->
+    <section class="tech-stack-section reveal">
+      <div class="container">
+        <div class="section-header">
+          <h2><i class="fas fa-cogs"></i> 기술 스택</h2>
+          <p>NAK 체스는 현대적이고 신뢰성 있는 기술을 기반으로 구축되었습니다.</p>
+        </div>
+        <div class="tech-stack-grid">
+          <div class="tech-item">
+            <i class="fab fa-node-js"></i>
+            <h3>Node.js</h3>
+            <p>이벤트 기반의 비동기 I/O를 사용하는 확장 가능한 서버사이드 환경</p>
+          </div>
+          <div class="tech-item">
+            <i class="fas fa-network-wired"></i>
+            <h3>Express.js</h3>
+            <p>Node.js를 위한 빠르고 간결한 웹 프레임워크</p>
+          </div>
+          <div class="tech-item">
+            <i class="fas fa-wave-square"></i>
+            <h3>Socket.IO</h3>
+            <p>실시간 양방향 통신을 위한 라이브러리</p>
+          </div>
+          <div class="tech-item">
+            <i class="fas fa-database"></i>
+            <h3>SQLite</h3>
+            <p>서버리스, 제로 구성의 경량 데이터베이스 엔진</p>
+          </div>
+          <div class="tech-item">
+            <i class="fab fa-html5"></i>
+            <h3>HTML5 & CSS3</h3>
+            <p>최신 웹 표준을 준수하는 시맨틱 마크업과 스타일링</p>
+          </div>
+          <div class="tech-item">
+            <i class="fab fa-js-square"></i>
+            <h3>JavaScript (ES6+)</h3>
+            <p>동적이고 인터랙티브한 프론트엔드 로직 구현</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="features-cta reveal" style="background-color: var(--bg-secondary); padding-top: 80px; padding-bottom: 80px;">
+      <div class="container">
+        <div class="section-header">
+            <h2>지금 바로 NAK 체스를 시작하세요!</h2>
+            <p>모든 기능을 무료로 이용할 수 있습니다</p>
+        </div>
+        <div class="cta-buttons" style="display: flex; justify-content: center; gap: 20px;">
             <a href="game.html" class="btn btn-primary btn-lg">
               <i class="fas fa-play"></i> 게임 시작하기
             </a>
             <a href="how-to-play.html" class="btn btn-outline btn-lg">
               <i class="fas fa-book"></i> 게임 방법 알아보기
             </a>
-          </div>
         </div>
       </div>
     </section>
