@@ -68,7 +68,7 @@
       <div class="container">
         <!-- Getting Started Steps -->
         <div class="section-header reveal">
-          <h2>시작하기</h2>
+          <h2><i class="fas fa-rocket"></i> 시작하기</h2>
           <p>4단계로 간단하게 게임을 시작할 수 있습니다</p>
         </div>
 
@@ -155,7 +155,7 @@
 
         <!-- Game Controls Section -->
         <div class="game-controls-section reveal">
-          <h2>게임 컨트롤</h2>
+          <h2><i class="fas fa-gamepad"></i> 게임 컨트롤</h2>
           <p>게임 중 사용할 수 있는 다양한 기능들입니다</p>
 
           <div class="controls-grid">
@@ -199,7 +199,7 @@
 
         <!-- Game Modes Section -->
         <div class="game-modes-section reveal">
-          <h2>게임 모드</h2>
+          <h2><i class="fas fa-chess-clock"></i> 게임 모드</h2>
           <p>다양한 시간 제한 모드를 선택할 수 있습니다</p>
 
           <div class="modes-grid">
@@ -259,7 +259,7 @@
 
         <!-- Video Tutorial -->
         <div class="video-tutorial-section reveal">
-          <h2>비디오 가이드</h2>
+          <h2><i class="fas fa-video"></i> 비디오 가이드</h2>
           <p>영상으로 더 자세히 알아보세요</p>
           <div class="video-placeholder">
             <i class="fas fa-play-circle" aria-hidden="true"></i>
@@ -270,7 +270,7 @@
 
         <!-- FAQ Section -->
         <div class="faq-section reveal">
-          <h2>자주 묻는 질문</h2>
+          <h2><i class="fas fa-question-circle"></i> 자주 묻는 질문</h2>
 
           <div class="faq-list">
             <div class="faq-item">
@@ -372,26 +372,147 @@
     // Set current year
     document.getElementById('current-year').textContent = new Date().getFullYear();
 
-    // Reveal on scroll
+    // Enhanced Reveal on scroll animation
     const revealElements = document.querySelectorAll('.reveal');
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
+          const delay = entry.target.dataset.delay || 0;
+
+          setTimeout(() => {
+            entry.target.classList.add('visible');
+
+            // Add stagger effect for nested elements
+            const nestedElements = entry.target.querySelectorAll(
+              '.step-tips li, .control-card, .mode-card li, .option-card'
+            );
+            nestedElements.forEach((el, index) => {
+              setTimeout(() => {
+                el.style.opacity = '1';
+                el.style.transform = 'translateY(0)';
+              }, index * 50);
+            });
+          }, parseInt(delay));
         }
       });
-    }, { threshold: 0.1 });
+    }, {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    });
+
+    // Initialize nested elements with hidden state
+    document.querySelectorAll(
+      '.step-tips li, .control-card, .mode-card li, .option-card'
+    ).forEach(el => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(20px)';
+      el.style.transition = 'all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1)';
+    });
 
     revealElements.forEach(el => observer.observe(el));
 
-    // FAQ accordion
+    // Enhanced FAQ accordion
     document.querySelectorAll('.faq-question').forEach(button => {
       button.addEventListener('click', () => {
         const isExpanded = button.getAttribute('aria-expanded') === 'true';
+        const faqItem = button.parentElement;
+        const faqAnswer = faqItem.querySelector('.faq-answer');
+
+        // Close all other FAQ items
+        document.querySelectorAll('.faq-item').forEach(item => {
+          if (item !== faqItem && item.classList.contains('active')) {
+            item.classList.remove('active');
+            item.querySelector('.faq-question').setAttribute('aria-expanded', 'false');
+          }
+        });
+
+        // Toggle current FAQ item
         button.setAttribute('aria-expanded', !isExpanded);
-        button.parentElement.classList.toggle('active');
+        faqItem.classList.toggle('active');
+
+        // Animate answer height
+        if (!isExpanded) {
+          const answerHeight = faqAnswer.scrollHeight;
+          faqAnswer.style.maxHeight = answerHeight + 'px';
+        } else {
+          faqAnswer.style.maxHeight = '0';
+        }
       });
     });
+
+    // Add hover effect to mode cards
+    const modeCards = document.querySelectorAll('.mode-card');
+    modeCards.forEach(card => {
+      card.addEventListener('mouseenter', function() {
+        this.style.transform = 'translateY(-15px) rotateX(5deg) scale(1.02)';
+      });
+
+      card.addEventListener('mouseleave', function() {
+        this.style.transform = 'translateY(0) rotateX(0) scale(1)';
+      });
+    });
+
+    // Add hover effect to control cards
+    const controlCards = document.querySelectorAll('.control-card');
+    controlCards.forEach(card => {
+      card.addEventListener('mouseenter', function() {
+        this.style.transform = 'translateY(-10px) rotateZ(2deg)';
+      });
+
+      card.addEventListener('mouseleave', function() {
+        this.style.transform = 'translateY(0) rotateZ(0)';
+      });
+    });
+
+    // Smooth scroll for navigation links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      });
+    });
+
+    // Add progress indicator for step cards
+    const stepCards = document.querySelectorAll('.step-detailed');
+    stepCards.forEach((card, index) => {
+      const progressBar = document.createElement('div');
+      progressBar.className = 'step-progress';
+      progressBar.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+        width: 0;
+        transition: width 0.3s ease;
+      `;
+      card.appendChild(progressBar);
+
+      card.addEventListener('mouseenter', function() {
+        progressBar.style.width = '100%';
+      });
+
+      card.addEventListener('mouseleave', function() {
+        progressBar.style.width = '0';
+      });
+    });
+
+    // Video placeholder click effect
+    const videoPlaceholder = document.querySelector('.video-placeholder');
+    if (videoPlaceholder) {
+      videoPlaceholder.addEventListener('click', function() {
+        this.style.transform = 'scale(0.95)';
+        setTimeout(() => {
+          this.style.transform = 'translateY(-5px)';
+        }, 150);
+      });
+    }
   </script>
 </body>
 </html>
