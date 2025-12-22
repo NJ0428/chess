@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>마이 페이지 - NAK 체스 게임</title>
+  <meta name="description" content="NAK 체스 마이 페이지에서 개인 프로필, 게임 통계, 업적 등을 확인하고 관리하세요.">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="main.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Skip to Content -->
+  <a href="#main-content" class="skip-to-content">메인 컨텐츠로 이동</a>
+
+  <header id="header" class="header" role="banner">
+    <div class="container">
+      <div class="logo">
+        <h1><a href="index.html" style="text-decoration: none; color: inherit;"><i class="fas fa-chess-king" aria-hidden="true"></i> NAK 체스</a></h1>
+      </div>
+      <nav class="nav" role="navigation" aria-label="메인 네비게이션">
+        <ul class="nav-list" id="nav-list">
+          <li><a href="index.html" class="nav-link">홈</a></li>
+          <li><a href="features.html" class="nav-link">기능</a></li>
+          <li><a href="how-to-play.html" class="nav-link">게임 방법</a></li>
+          <li><a href="chess-rules.html" class="nav-link">체스 규칙</a></li>
+          <li><a href="leaderboard.html" class="nav-link">리더보드</a></li>
+          <li><a href="stats.html" class="nav-link">통계</a></li>
+          <li><a href="mypage.html" class="nav-link active">마이페이지</a></li>
+        </ul>
+      </nav>
+      <div class="header-actions">
+        <!-- Dark Mode Toggle -->
+        <button id="dark-mode-toggle" class="icon-btn" aria-label="다크모드 전환" title="다크모드 전환">
+          <i class="fas fa-moon"></i>
+        </button>
+
+        <!-- Notifications -->
+        <button id="notifications-btn" class="icon-btn" aria-label="알림" title="알림">
+          <i class="fas fa-bell"></i>
+          <span class="notification-badge" id="notification-badge" style="display: none;">0</span>
+        </button>
+
+        <!-- Profile -->
+        <div id="auth-links" class="auth-links">
+          <div class="profile-menu">
+            <button id="profile-menu-btn" class="profile-btn">
+              <div class="profile-avatar">
+                <i class="fas fa-user"></i>
+              </div>
+              <span class="profile-name">Player</span>
+              <i class="fas fa-chevron-down"></i>
+            </button>
+            <div id="profile-dropdown" class="profile-dropdown">
+              <a href="mypage.html" class="dropdown-item active">
+                <i class="fas fa-user"></i> 마이페이지
+              </a>
+              <a href="stats.html" class="dropdown-item">
+                <i class="fas fa-chart-line"></i> 통계
+              </a>
+              <a href="#" class="dropdown-item" id="settings-btn">
+                <i class="fas fa-cog"></i> 설정
+              </a>
+              <div class="dropdown-divider"></div>
+              <a href="#" class="dropdown-item logout-btn" id="logout-btn">
+                <i class="fas fa-sign-out-alt"></i> 로그아웃
+              </a>
+            </div>
+          </div>
+          <a href="game.html" class="btn btn-sm btn-primary">게임 시작</a>
+        </div>
+      </div>
+      <div class="mobile-nav-toggle" id="mobile-nav-toggle" aria-label="모바일 메뉴 토글">
+        <i class="fas fa-bars"></i>
+      </div>
+    </div>
+  </header>
+
+  <!-- Notification Dropdown -->
+  <div id="notification-dropdown" class="notification-dropdown" style="display: none;" role="menu">
+    <div class="notification-header">
+      <h3>알림</h3>
+      <button id="clear-notifications" class="btn-text">모두 삭제</button>
+    </div>
+    <div id="notification-list" class="notification-list">
+      <p class="no-notifications">새로운 알림이 없습니다</p>
+    </div>
+  </div>
+
+  <main id="main-content">
+    <!-- Page Hero -->
+    <section class="page-hero">
+      <div class="container">
+        <div class="page-hero-content reveal">
+          <h1><i class="fas fa-user-circle"></i> 마이 페이지</h1>
+          <p>개인 프로필과 게임 통계를 관리하세요</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Profile Section -->
+    <section class="profile-section">
+      <div class="container">
+        <div class="profile-card reveal">
+          <div class="profile-header">
+            <div class="profile-avatar-large">
+              <i class="fas fa-user"></i>
+              <div class="avatar-edit">
+                <button id="edit-avatar-btn" class="edit-btn" title="프로필 사진 변경">
+                  <i class="fas fa-camera"></i>
+                </button>
+              </div>
+            </div>
+            <div class="profile-info">
+              <div class="profile-name-section">
+                <h2 id="profile-username">Player_123</h2>
+                <button id="edit-name-btn" class="edit-btn-text" title="닉네임 변경">
+                  <i class="fas fa-edit"></i>
+                </button>
+              </div>
+              <div class="profile-meta">
+                <div class="meta-item">
+                  <i class="fas fa-trophy"></i>
+                  <span id="profile-rating">1200</span> 레이팅
+                </div>
+                <div class="meta-item">
+                  <i class="fas fa-calendar-alt"></i>
+                  <span id="join-date">2024년 1월</span> 가입
+                </div>
+                <div class="meta-item">
+                  <i class="fas fa-chess-pawn"></i>
+                  <span id="total-games">0</span> 게임
+                </div>
+              </div>
+              <div class="profile-badges">
+                <span class="badge badge-primary">Novice</span>
+                <span class="badge badge-secondary" id="country-badge" style="display: none;">
+                  <i class="fas fa-flag"></i> 한국
+                </span>
+              </div>
+            </div>
+            <div class="profile-actions">
+              <button id="edit-profile-btn" class="btn btn-outline">
+                <i class="fas fa-edit"></i> 프로필 편집
+              </button>
+              <button id="share-profile-btn" class="btn btn-primary">
+                <i class="fas fa-share-alt"></i> 프로필 공유
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Stats Summary -->
+    <section class="stats-summary-section">
+      <div class="container">
+        <div class="section-header reveal">
+          <h2><i class="fas fa-chart-pie"></i> 게임 통계 요약</h2>
+          <p>최근 게임 성과를 한눈에 확인하세요</p>
+        </div>
+
+        <div class="stats-summary-grid">
+          <div class="summary-card win-rate-card reveal">
+            <div class="summary-icon">
+              <i class="fas fa-percentage"></i>
+            </div>
+            <div class="summary-content">
+              <div class="summary-value" id="win-rate">0%</div>
+              <div class="summary-label">승률</div>
+              <div class="summary-change positive" id="win-rate-change">
+                <i class="fas fa-arrow-up"></i> 0%
+              </div>
+            </div>
+          </div>
+
+          <div class="summary-card streak-card reveal">
+            <div class="summary-icon">
+              <i class="fas fa-fire"></i>
+            </div>
+            <div class="summary-content">
+              <div class="summary-value" id="current-streak">0</div>
+              <div class="summary-label">현재 연승</div>
+              <div class="summary-change" id="streak-type">
+                <i class="fas fa-arrow-up"></i> 최고 기록
+              </div>
+            </div>
+          </div>
+
+          <div class="summary-card time-card reveal">
+            <div class="summary-icon">
+              <i class="fas fa-clock"></i>
+            </div>
+            <div class="summary-content">
+              <div class="summary-value" id="total-time">0시간</div>
+              <div class="summary-label">총 플레이 시간</div>
+              <div class="summary-change" id="avg-game-time">
+                평균 0분/게임
+              </div>
+            </div>
+          </div>
+
+          <div class="summary-card favorite-card reveal">
+            <div class="summary-icon">
+              <i class="fas fa-chess"></i>
+            </div>
+            <div class="summary-content">
+              <div class="summary-value" id="favorite-piece">퀸</div>
+              <div class="summary-label">선호 기물</div>
+              <div class="summary-change" id="piece-success">
+                성공률 0%
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Actions -->
+    <section class="quick-actions-section">
+      <div class="container">
+        <div class="quick-actions-grid reveal">
+          <a href="game.html" class="quick-action-card">
+            <div class="action-icon">
+              <i class="fas fa-play"></i>
+            </div>
+            <h3>빠른 게임</h3>
+            <p>즉시 새로운 게임 시작</p>
+          </a>
+
+          <a href="stats.html" class="quick-action-card">
+            <div class="action-icon">
+              <i class="fas fa-chart-line"></i>
+            </div>
+            <h3>상세 통계</h3>
+            <p>자세한 게임 분석 보기</p>
+          </a>
+
+          <button class="quick-action-card" id="achievements-btn">
+            <div class="action-icon">
+              <i class="fas fa-medal"></i>
+            </div>
+            <h3>업적</h3>
+            <p>달성한 업적 확인</p>
+          </button>
+
+          <button class="quick-action-card" id="friends-btn">
+            <div class="action-icon">
+              <i class="fas fa-user-friends"></i>
+            </div>
+            <h3>친구</h3>
+            <p>친구 관리 및 초대</p>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recent Games -->
+    <section class="recent-games-section">
+      <div class="container">
+        <div class="section-header reveal">
+          <h2><i class="fas fa-history"></i> 최근 게임 기록</h2>
+          <p>최근 10게임의 결과를 확인하세요</p>
+        </div>
+
+        <div class="recent-games-container reveal">
+          <div id="recent-games-list" class="recent-games-list">
+            <div class="loading-message">
+              <i class="fas fa-spinner fa-spin"></i>
+              <p>최근 게임 기록을 불러오는 중...</p>
+            </div>
+          </div>
+
+          <div class="recent-games-footer">
+            <a href="stats.html#history" class="btn btn-outline">
+              <i class="fas fa-list"></i> 전체 기록 보기
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings Section -->
+    <section class="settings-section">
+      <div class="container">
+        <div class="section-header reveal">
+          <h2><i class="fas fa-cog"></i> 설정</h2>
+          <p>게임 및 계정 설정을 관리하세요</p>
+        </div>
+
+        <div class="settings-grid reveal">
+          <!-- Profile Settings -->
+          <div class="settings-card">
+            <div class="settings-header">
+              <h3><i class="fas fa-user-edit"></i> 프로필 설정</h3>
+            </div>
+            <div class="settings-content">
+              <div class="setting-item">
+                <label>닉네임</label>
+                <div class="setting-input-group">
+                  <input type="text" id="nickname-input" value="Player_123" maxlength="20">
+                  <button class="btn btn-sm btn-primary" id="save-nickname-btn">저장</button>
+                </div>
+              </div>
+              <div class="setting-item">
+                <label>국가</label>
+                <select id="country-select">
+                  <option value="KR" selected>대한민국</option>
+                  <option value="US">United States</option>
+                  <option value="JP">日本</option>
+                  <option value="CN">中国</option>
+                </select>
+              </div>
+              <div class="setting-item">
+                <label>프로필 공개</label>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="public-profile" checked>
+                  <label for="public-profile" class="toggle-label"></label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Game Settings -->
+          <div class="settings-card">
+            <div class="settings-header">
+              <h3><i class="fas fa-gamepad"></i> 게임 설정</h3>
+            </div>
+            <div class="settings-content">
+              <div class="setting-item">
+                <label>기본 시간 제한</label>
+                <select id="time-control-select">
+                  <option value="bullet">Bullet (1+0)</option>
+                  <option value="blitz">Blitz (5+0)</option>
+                  <option value="rapid" selected>Rapid (10+0)</option>
+                  <option value="classical">Classical (30+0)</option>
+                </select>
+              </div>
+              <div class="setting-item">
+                <label>게임 소리</label>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="game-sounds" checked>
+                  <label for="game-sounds" class="toggle-label"></label>
+                </div>
+              </div>
+              <div class="setting-item">
+                <label>자동 프롬프션</label>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="auto-promotion" checked>
+                  <label for="auto-promotion" class="toggle-label"></label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Privacy Settings -->
+          <div class="settings-card">
+            <div class="settings-header">
+              <h3><i class="fas fa-shield-alt"></i> 개인정보 설정</h3>
+            </div>
+            <div class="settings-content">
+              <div class="setting-item">
+                <label>온라인 상태 표시</label>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="online-status" checked>
+                  <label for="online-status" class="toggle-label"></label>
+                </div>
+              </div>
+              <div class="setting-item">
+                <label>게임 초대 수신</label>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="game-invites" checked>
+                  <label for="game-invites" class="toggle-label"></label>
+                </div>
+              </div>
+              <div class="setting-item">
+                <label>친구 요청 수신</label>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="friend-requests" checked>
+                  <label for="friend-requests" class="toggle-label"></label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Account Management -->
+    <section class="account-section">
+      <div class="container">
+        <div class="section-header reveal">
+          <h2><i class="fas fa-user-cog"></i> 계정 관리</h2>
+          <p>계정 정보를 관리하고 보안 설정을 확인하세요</p>
+        </div>
+
+        <div class="account-management reveal">
+          <div class="account-card">
+            <div class="account-header">
+              <h3><i class="fas fa-envelope"></i> 이메일 주소</h3>
+              <button class="btn btn-sm btn-outline" id="change-email-btn">변경</button>
+            </div>
+            <div class="account-info">
+              <span id="user-email">user@example.com</span>
+              <span class="status verified">
+                <i class="fas fa-check-circle"></i> 인증됨
+              </span>
+            </div>
+          </div>
+
+          <div class="account-card">
+            <div class="account-header">
+              <h3><i class="fas fa-lock"></i> 비밀번호</h3>
+              <button class="btn btn-sm btn-outline" id="change-password-btn">변경</button>
+            </div>
+            <div class="account-info">
+              <span>마지막 변경: 2024년 1월 1일</span>
+            </div>
+          </div>
+
+          <div class="account-card">
+            <div class="account-header">
+              <h3><i class="fas fa-download"></i> 데이터 내보내기</h3>
+            </div>
+            <div class="account-info">
+              <p>게임 기록과 통계 데이터를 다운로드하세요</p>
+              <button class="btn btn-outline" id="export-data-btn">
+                <i class="fas fa-download"></i> 데이터 내보내기
+              </button>
+            </div>
+          </div>
+
+          <div class="account-card danger-zone">
+            <div class="account-header">
+              <h3><i class="fas fa-exclamation-triangle"></i> 위험 구역</h3>
+            </div>
+            <div class="account-info">
+              <p>계정을 삭제하면 모든 데이터가 영구적으로 삭제됩니다</p>
+              <button class="btn btn-danger" id="delete-account-btn">
+                <i class="fas fa-trash"></i> 계정 삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-text">
+          <p>&copy; <span id="current-year"></span> NAK 체스. All Rights Reserved.</p>
+          <p class="version">Version 1.0.0</p>
+        </div>
+        <div class="footer-social">
+          <a href="https://github.com/nakchess" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
+            <i class="fab fa-github" aria-hidden="true"></i>
+          </a>
+          <a href="https://linkedin.com/company/nakchess" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+            <i class="fab fa-linkedin" aria-hidden="true"></i>
+          </a>
+          <a href="https://twitter.com/nakchess" target="_blank" rel="noopener noreferrer" aria-label="Twitter">
+            <i class="fab fa-twitter" aria-hidden="true"></i>
+          </a>
+          <a href="https://discord.gg/nakchess" target="_blank" rel="noopener noreferrer" aria-label="Discord">
+            <i class="fab fa-discord" aria-hidden="true"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Modals -->
+  <!-- Profile Edit Modal -->
+  <div id="profile-modal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <div class="modal-header">
+        <h3><i class="fas fa-user-edit"></i> 프로필 편집</h3>
+      </div>
+      <div class="modal-body">
+        <form id="profile-form">
+          <div class="form-group">
+            <label for="modal-username">닉네임</label>
+            <input type="text" id="modal-username" maxlength="20" required>
+          </div>
+          <div class="form-group">
+            <label for="modal-bio">자기소개</label>
+            <textarea id="modal-bio" rows="3" maxlength="200"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="modal-country">국가</label>
+            <select id="modal-country">
+              <option value="KR">대한민국</option>
+              <option value="US">United States</option>
+              <option value="JP">日本</option>
+              <option value="CN">中国</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="cancel-profile-edit">취소</button>
+        <button class="btn btn-primary" id="save-profile-edit">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Achievements Modal -->
+  <div id="achievements-modal" class="modal">
+    <div class="modal-content large-modal">
+      <span class="close">&times;</span>
+      <div class="modal-header">
+        <h3><i class="fas fa-medal"></i> 업적</h3>
+      </div>
+      <div class="modal-body">
+        <div id="achievements-list" class="achievements-grid">
+          <div class="loading-message">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>업적을 불러오는 중...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Account Modal -->
+  <div id="delete-account-modal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <div class="modal-header danger">
+        <h3><i class="fas fa-exclamation-triangle"></i> 계정 삭제 확인</h3>
+      </div>
+      <div class="modal-body">
+        <div class="warning-message">
+          <i class="fas fa-exclamation-triangle"></i>
+          <h4>정말 계정을 삭제하시겠습니까?</h4>
+          <p>계정을 삭제하면 다음 정보들이 영구적으로 삭제됩니다:</p>
+          <ul>
+            <li>모든 게임 기록</li>
+            <li>레이팅과 통계</li>
+            <li>업적과 배지</li>
+            <li>친구 목록</li>
+            <li>계정 정보</li>
+          </ul>
+          <p><strong>이 작업은 되돌릴 수 없습니다.</strong></p>
+        </div>
+        <div class="form-group">
+          <label for="delete-confirmation">삭제하려면 "계정 삭제"를 입력하세요</label>
+          <input type="text" id="delete-confirmation" placeholder="계정 삭제">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="cancel-delete">취소</button>
+        <button class="btn btn-danger" id="confirm-delete" disabled>계정 삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast">
+    <div class="toast-content">
+      <i class="toast-icon"></i>
+      <span class="toast-message"></span>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+  <script src="js/mypage.js"></script>
+  <script>
+    // Set current year
+    const currentYear = new Date().getFullYear();
+    const yearElements = document.querySelectorAll('#current-year');
+    yearElements.forEach(el => {
+      if (el) el.textContent = currentYear;
+    });
+
+    // Enhanced Reveal on scroll animation
+    const revealElements = document.querySelectorAll('.reveal');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const delay = entry.target.dataset.delay || 0;
+          setTimeout(() => {
+            entry.target.classList.add('visible');
+            animateNumbers(entry.target);
+          }, parseInt(delay));
+        }
+      });
+    }, {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    });
+
+    revealElements.forEach(el => observer.observe(el));
+
+    // Animate numbers function
+    function animateNumbers(container) {
+      const numbers = container.querySelectorAll('.summary-value, .stat-number');
+      numbers.forEach(number => {
+        const text = number.textContent;
+        const hasPercent = text.includes('%');
+        const hasTime = text.includes('시간') || text.includes('분');
+        const numericValue = parseInt(text.replace(/[^0-9]/g, '')) || 0;
+
+        if (numericValue > 0) {
+          const duration = 2000;
+          const startTime = performance.now();
+
+          function updateNumber(currentTime) {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+            const currentValue = Math.floor(numericValue * easeOutQuart);
+
+            if (hasPercent) {
+              number.textContent = currentValue + '%';
+            } else if (hasTime) {
+              number.textContent = currentValue + '시간';
+            } else {
+              number.textContent = currentValue.toLocaleString();
+            }
+
+            if (progress < 1) {
+              requestAnimationFrame(updateNumber);
+            }
+          }
+
+          requestAnimationFrame(updateNumber);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
