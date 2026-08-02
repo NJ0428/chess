@@ -47,6 +47,7 @@ const gameState = {
   currentTurn: 'white',
   playerName: '',
   isSpectating: false,
+  isAIGame: false,
   spectatorName: '',
   audioLoaded: {
     check: false,
@@ -91,6 +92,10 @@ const elements = {
   spectatorChatMessages: document.getElementById('spectatorChatMessages'),
   spectatorChatInput: document.getElementById('spectatorChatInput'),
   sendSpectatorChatBtn: document.getElementById('sendSpectatorChatBtn'),
+
+  // AI 대전
+  createAIGameBtn: document.getElementById('createAIGameBtn'),
+  aiDifficultySelect: document.getElementById('aiDifficultySelect'),
 
   // 대기실
   gameSetup: document.getElementById('gameSetup'),
@@ -331,16 +336,31 @@ class RoomManager {
       playerColor: null,
       gameBoard: null,
       selectedSquare: null,
-      myTurn: false
+      myTurn: false,
+      isAIGame: false
     });
 
     UIManager.showScreen('lobby');
     ChatManager.clearChat();
+    // 채팅 카드 복원
+    const chatCard = document.getElementById('chatCard');
+    if (chatCard) chatCard.style.display = '';
     this.getRoomList();
   }
 
   static getRoomList() {
     socket.emit('getRoomList');
+  }
+
+  static createAIGame() {
+    const playerName = elements.playerNameInput.value.trim();
+    const difficulty = elements.aiDifficultySelect ? elements.aiDifficultySelect.value : 'medium';
+    if (!playerName) {
+      UIManager.showNotification('플레이어 이름이 필요합니다. 로그인 상태를 확인해주세요.');
+      return;
+    }
+    gameState.playerName = playerName;
+    socket.emit('createAIGame', { playerName, difficulty });
   }
 }
 
@@ -869,6 +889,9 @@ class EventManager {
   static init() {
     // 버튼 이벤트
     elements.createRoomBtn.addEventListener('click', RoomManager.createRoom);
+    if (elements.createAIGameBtn) {
+      elements.createAIGameBtn.addEventListener('click', RoomManager.createAIGame);
+    }
     elements.refreshRoomListBtn.addEventListener('click', RoomManager.getRoomList);
     elements.backToLobbyBtn.addEventListener('click', RoomManager.leaveRoom); // 대기실에서 나갈 때 방을 떠나도록 수정
     elements.restartBtn.addEventListener('click', GameLogic.restartGame);
@@ -909,6 +932,33 @@ class EventManager {
 
     socket.on('spectateListUpdated', () => {
       SpectateManager.getSpectateList();
+    });
+
+    socket.on('aiGameCreated', (data) => {
+      gameState.currentRoom = data.roomId;
+      gameState.playerColor = data.color;
+      gameState.isAIGame = true;
+      gameState.currentTurn = data.turn;
+      gameState.myTurn = true;
+      gameState.gameBoard = data.board;
+
+      UIManager.showScreen('gameBoard');
+      BoardRenderer.render(data.board);
+      UIManager.updateGameInfo();
+      UIManager.updateBackgroundColor();
+
+      if (elements.whitePlayerInfo) {
+        elements.whitePlayerInfo.querySelector('span').textContent = `백: ${data.playerName}`;
+      }
+      if (elements.blackPlayerInfo) {
+        const diffLabel = data.aiDifficulty === 'easy' ? '쉬움' : data.aiDifficulty === 'hard' ? '어려움' : '보통';
+        elements.blackPlayerInfo.querySelector('span').textContent = `흑: AI (${diffLabel})`;
+      }
+      // AI 게임에서는 채팅 숨기기
+      const chatCard = document.getElementById('chatCard');
+      if (chatCard) chatCard.style.display = 'none';
+
+      UIManager.showNotification('AI 대전 시작! 당신은 백 (선공)입니다.');
     });
 
     socket.on('roomCreated', (data) => {

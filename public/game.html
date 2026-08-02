@@ -62,6 +62,22 @@
             </button>
           </div>
             
+          <div class="lobby-card ai-game-card">
+            <h3><i class="fas fa-robot"></i> AI 대전</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6;">AI와 1대1 체스를 즐기세요! 상대방 없이 바로 시작할 수 있습니다.</p>
+            <div class="form-group">
+              <label for="aiDifficultySelect">난이도 선택</label>
+              <select id="aiDifficultySelect" style="width:100%;padding:12px 16px;border:1px solid var(--border-color);border-radius:var(--border-radius-sm);font-size:1rem;background-color:var(--bg-primary);color:var(--text-primary);">
+                <option value="easy">쉬움 - 랜덤 이동</option>
+                <option value="medium" selected>보통 - 기본 전략 (추천)</option>
+                <option value="hard">어려움 - 심화 전략</option>
+              </select>
+            </div>
+            <button id="createAIGameBtn" class="btn btn-primary" style="width:100%;">
+              <i class="fas fa-robot"></i> AI와 대전 시작
+            </button>
+          </div>
+
           <div class="lobby-card room-list-card">
             <div class="room-list-header">
               <h3><i class="fas fa-door-open"></i> 참가 가능한 방</h3>
@@ -74,6 +90,81 @@
               <div class="no-rooms-message">
                 <i class="fas fa-inbox"></i>
                 <p>현재 참가할 수 있는 방이 없습니다.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 관전 목록 화면 -->
+      <section id="spectate" class="game-section lobby-section" style="display: none;">
+        <div class="section-header">
+          <h2>게임 관전</h2>
+          <p>진행 중인 게임을 관전하세요</p>
+        </div>
+        <div class="lobby-content">
+          <div class="lobby-card">
+            <h3><i class="fas fa-user-circle"></i> 관전자 정보</h3>
+            <div class="form-group">
+              <label for="spectatorNameInput">닉네임</label>
+              <input type="text" id="spectatorNameInput" placeholder="관전자 닉네임을 입력하세요">
+            </div>
+          </div>
+          <div class="lobby-card room-list-card">
+            <div class="room-list-header">
+              <h3><i class="fas fa-eye"></i> 진행 중인 게임</h3>
+              <button id="refreshSpectateListBtn" class="btn btn-outline btn-sm">
+                <i class="fas fa-sync-alt"></i> 새로고침
+              </button>
+            </div>
+            <div id="spectateList" class="room-list">
+              <div class="no-games-message" style="text-align:center;padding:20px;color:var(--text-secondary);">
+                <i class="fas fa-chess-board" style="font-size:2rem;margin-bottom:10px;display:block;"></i>
+                <p>현재 진행 중인 게임이 없습니다.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 관전 게임 화면 -->
+      <section id="spectateGame" class="game-section" style="display: none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+          <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;">
+            <span id="spectateGameInfo" style="color:var(--text-secondary);"></span>
+            <span id="spectateCurrentTurn" style="color:var(--primary-color);font-weight:600;"></span>
+            <span id="spectatorCount" style="color:var(--text-secondary);">관전자: 0명</span>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button id="backToSpectateListBtn" class="btn btn-outline btn-sm">
+              <i class="fas fa-arrow-left"></i> 목록으로
+            </button>
+            <button id="leaveSpectateBtn" class="btn btn-outline btn-sm">
+              <i class="fas fa-sign-out-alt"></i> 관전 종료
+            </button>
+          </div>
+        </div>
+        <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+          <div style="flex:1;min-width:300px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+              <div id="spectateWhitePlayerInfo" class="player-info" style="flex:1;margin-right:10px;">
+                <i class="fas fa-chess-king"></i><span>백: </span>
+              </div>
+              <div id="spectateBlackPlayerInfo" class="player-info" style="flex:1;">
+                <i class="fas fa-chess-king"></i><span>흑: </span>
+              </div>
+            </div>
+            <div id="spectateBoard" class="chess-board"></div>
+          </div>
+          <div style="width:280px;">
+            <div class="info-card">
+              <h3><i class="fas fa-comments"></i> 관전자 채팅</h3>
+              <div id="spectatorChatMessages" class="chat-messages" style="height:200px;overflow-y:auto;margin-bottom:10px;">
+                <div class="no-messages" style="color:var(--text-secondary);text-align:center;padding:20px;">아직 관전자 채팅이 없습니다.</div>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="spectatorChatInput" placeholder="관전자 채팅..." style="flex:1;padding:8px 12px;border:1px solid var(--border-color);border-radius:var(--border-radius-sm);background-color:var(--bg-primary);color:var(--text-primary);">
+                <button id="sendSpectatorChatBtn" class="btn btn-primary btn-sm">전송</button>
               </div>
             </div>
           </div>
@@ -101,7 +192,80 @@
     
       <!-- 게임 화면 -->
       <section id="gameBoard" class="game-section game-play-section" style="display: none;">
-        <!-- 게임 화면 내용은 app.js에 의해 동적으로 관리됩니다. -->
+        <div class="game-layout">
+          <!-- 왼쪽 사이드바: 플레이어 정보 + 채팅 -->
+          <div class="game-sidebar">
+            <div class="info-card">
+              <h3><i class="fas fa-chess-king"></i> 플레이어</h3>
+              <div class="players-list">
+                <div id="whitePlayerInfo" class="player-info">
+                  <i class="fas fa-chess-king" style="color:#e0e0e0;"></i>
+                  <span>백: </span>
+                </div>
+                <div id="blackPlayerInfo" class="player-info" style="margin-top:8px;">
+                  <i class="fas fa-chess-king" style="color:#2a2a4a;"></i>
+                  <span>흑: </span>
+                </div>
+              </div>
+            </div>
+            <div class="info-card">
+              <h3><i class="fas fa-info-circle"></i> 게임 정보</h3>
+              <p id="playerColor" style="margin-bottom:8px;color:var(--text-secondary);">내 색상: 대기 중</p>
+              <p id="currentTurn" style="margin-bottom:8px;color:var(--text-secondary);">현재 턴: 백</p>
+              <p id="gameStatus" style="font-weight:600;color:var(--primary-light);"></p>
+            </div>
+            <div class="info-card" id="chatCard">
+              <h3><i class="fas fa-comments"></i> 채팅</h3>
+              <div class="chat-container">
+                <div id="chatMessages" class="chat-messages">
+                  <div class="no-messages" style="color:var(--text-secondary);text-align:center;padding:20px;">아직 채팅 메시지가 없습니다.</div>
+                </div>
+                <div class="chat-input-container" style="display:flex;gap:8px;margin-top:10px;">
+                  <input type="text" id="chatInput" placeholder="메시지 입력...">
+                  <button id="sendChatBtn" class="btn btn-primary btn-sm">전송</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 가운데: 체스판 -->
+          <div class="board-container">
+            <div id="board" class="chess-board"></div>
+          </div>
+
+          <!-- 오른쪽 사이드바: 컨트롤 + 규칙 -->
+          <div class="game-sidebar">
+            <div class="info-card">
+              <h3><i class="fas fa-gamepad"></i> 컨트롤</h3>
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <button id="showRulesBtn" class="btn btn-outline">
+                  <i class="fas fa-book"></i> 체스 규칙
+                </button>
+                <button id="restartBtn" class="btn btn-primary" style="display:none;">
+                  <i class="fas fa-redo"></i> 다시 시작
+                </button>
+                <button id="leaveGameBtn" class="btn btn-outline">
+                  <i class="fas fa-sign-out-alt"></i> 나가기
+                </button>
+              </div>
+            </div>
+            <div id="chessRulesPanel" class="info-card" style="display:none;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                <h3 style="margin:0;"><i class="fas fa-book"></i> 체스 규칙</h3>
+                <button id="closeRulesBtn" class="btn btn-sm btn-outline"><i class="fas fa-times"></i></button>
+              </div>
+              <div style="color:var(--text-secondary);line-height:2;">
+                <p><strong style="color:var(--text-primary);">킹 ♚</strong>: 모든 방향 1칸</p>
+                <p><strong style="color:var(--text-primary);">퀸 ♛</strong>: 모든 방향 무제한</p>
+                <p><strong style="color:var(--text-primary);">룩 ♜</strong>: 직선 무제한</p>
+                <p><strong style="color:var(--text-primary);">비숍 ♝</strong>: 대각선 무제한</p>
+                <p><strong style="color:var(--text-primary);">나이트 ♞</strong>: L자형 이동</p>
+                <p><strong style="color:var(--text-primary);">폰 ♟</strong>: 앞 1칸 (첫 이동 2칸), 대각선 캡처</p>
+                <p style="margin-top:10px;"><strong style="color:var(--text-primary);">특수:</strong> 캐슬링, 앙파상</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
     </div>
   </main>
@@ -122,6 +286,17 @@
     </div>
   </footer>
 
+  <!-- 알림 -->
+  <div id="notification" class="game-notification" style="display:none;"></div>
+
+  <!-- 오디오 -->
+  <audio id="check-audio" src="sounds/check.mp3" preload="auto"></audio>
+  <audio id="checkmate-audio" src="sounds/checkmate.mp3" preload="auto"></audio>
+  <audio id="move-audio" src="sounds/move.mp3" preload="auto"></audio>
+  <audio id="capture-audio" src="sounds/capture.mp3" preload="auto"></audio>
+  <audio id="king-castling-audio" src="sounds/KingCastling.mp3" preload="auto"></audio>
+  <audio id="queen-castling-audio" src="sounds/QueenCastling.mp3" preload="auto"></audio>
+
   <!-- 템플릿 -->
   <template id="roomItemTemplate">
     <div class="room-item">
@@ -131,6 +306,24 @@
       </div>
       <button class="btn btn-primary join-btn">
         <i class="fas fa-sign-in-alt"></i> 참가
+      </button>
+    </div>
+  </template>
+
+  <template id="spectateItemTemplate">
+    <div class="room-item">
+      <div class="room-details">
+        <i class="fas fa-chess-board"></i>
+        <div>
+          <h4 class="game-players" style="margin:0;"></h4>
+          <div style="display:flex;gap:10px;font-size:0.85rem;color:var(--text-secondary);margin-top:4px;">
+            <span class="spectator-count"></span>
+            <span class="move-count"></span>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm spectate-btn">
+        <i class="fas fa-eye"></i> 관전
       </button>
     </div>
   </template>
