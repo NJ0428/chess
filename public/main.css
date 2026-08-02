@@ -727,6 +727,35 @@ section {
     flex-grow: 1;
 }
 
+/* 게임 알림 토스트 */
+.game-notification {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--primary-color);
+    color: white;
+    padding: 12px 24px;
+    border-radius: var(--border-radius-sm);
+    font-weight: 500;
+    z-index: 9999;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+/* AI 대전 카드 강조 */
+.ai-game-card {
+    border-color: var(--primary-color) !important;
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(109,93,216,0.1) 100%);
+}
+
+/* 게임 상태 바 */
+.check-status { color: var(--warning-color) !important; font-weight: 700; }
+.win-status   { color: var(--success-color) !important; font-weight: 700; }
+.lose-status  { color: var(--danger-color) !important; font-weight: 700; }
+
 /*=====================================================
     FOOTER
 =====================================================*/

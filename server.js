@@ -264,6 +264,7 @@ class ChessGame {
       socket.on('getRoomList', () => this.handleGetRoomList(socket));
       socket.on('getSpectateList', () => this.handleGetSpectateList(socket));
       socket.on('createRoom', (data) => this.handleCreateRoom(socket, data));
+      socket.on('createAIGame', (data) => this.handleCreateAIGame(socket, data));
       socket.on('joinRoom', (data) => this.handleJoinRoom(socket, data));
       socket.on('spectateRoom', (data) => this.handleSpectateRoom(socket, data));
       socket.on('movePiece', (data) => this.handleMovePiece(socket, data));
@@ -322,6 +323,60 @@ class ChessGame {
       return b.moveCount - a.moveCount;
     });
     socket.emit('spectateList', spectateList);
+  }
+
+  handleCreateAIGame(socket, data) {
+    const { playerName, difficulty } = data;
+    if (!playerName) {
+      socket.emit('error', '플레이어 이름이 필요합니다.');
+      return;
+    }
+    const roomId = `ai_${socket.id}_${Date.now()}`;
+    socket.join(roomId);
+    const room = this.createNewRoom(socket.id, playerName);
+    const diffLabel = difficulty === 'easy' ? '쉬움' : difficulty === 'hard' ? '어려움' : '보통';
+    room.players.black = 'AI';
+    room.playerNames.black = `AI (${diffLabel})`;
+    room.status = 'playing';
+    room.isAI = true;
+    room.aiColor = 'black';
+    room.aiDifficulty = difficulty || 'medium';
+    this.games[roomId] = room;
+    socket.emit('aiGameCreated', {
+      roomId,
+      color: 'white',
+      board: room.board,
+      turn: room.currentTurn,
+      playerName,
+      aiName: room.playerNames.black,
+      aiDifficulty: room.aiDifficulty
+    });
+    console.log(`AI 게임 생성: ${roomId}, 난이도: ${difficulty}`);
+  }
+
+  makeAIMove(roomId) {
+    const room = this.games[roomId];
+    if (!room || !room.isAI || room.status !== 'playing' || room.currentTurn !== room.aiColor) return;
+    const aiMove = ChessAI.getBestMove(
+      room.board,
+      room.aiColor,
+      room.aiDifficulty,
+      room.moveHistory || [],
+      room.castlingRights
+    );
+    if (!aiMove) {
+      io.to(room.players.white).emit('gameOver', {
+        winner: room.aiColor === 'black' ? 'white' : 'black',
+        message: 'AI가 이동할 수 없습니다. 스테일메이트!'
+      });
+      return;
+    }
+    const gameResult = this.processMove(room, aiMove.from, aiMove.to, aiMove.moveResult);
+    if (gameResult.gameEnded) {
+      this.endGame(roomId, gameResult);
+    } else {
+      this.continueTurn(roomId, room);
+    }
   }
 
   handleCreateRoom(socket, data) {
@@ -465,6 +520,9 @@ class ChessGame {
         this.endGame(roomId, gameResult);
       } else {
         this.continueTurn(roomId, room);
+        if (room.isAI && room.currentTurn === room.aiColor) {
+          setTimeout(() => this.makeAIMove(roomId), 500);
+        }
       }
     } else {
       socket.emit('error', '유효하지 않은 이동입니다.');
@@ -1152,6 +1210,118 @@ class ChessRules {
     }
 
     return result;
+  }
+}
+
+// AI 체스 엔진
+class ChessAI {
+  static getAllValidMoves(board, color, moveHistory, castlingRights) {
+    const moves = [];
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        const piece = board[row][col];
+        if (!piece || piece.color !== color) continue;
+        for (let toRow = 0; toRow < 8; toRow++) {
+          for (let toCol = 0; toCol < 8; toCol++) {
+            const result = ChessRules.isValidMove(board, [row, col], [toRow, toCol], color, moveHistory, castlingRights);
+            if (result.valid) {
+              moves.push({ from: [row, col], to: [toRow, toCol], moveResult: result });
+            }
+          }
+        }
+      }
+    }
+    return moves;
+  }
+
+  static evaluateBoard(board) {
+    const values = { pawn: 100, knight: 320, bishop: 330, rook: 500, queen: 900, king: 20000 };
+    let score = 0;
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        const piece = board[row][col];
+        if (!piece) continue;
+        const val = values[piece.type] || 0;
+        score += piece.color === 'white' ? val : -val;
+      }
+    }
+    return score;
+  }
+
+  static cloneBoard(board) {
+    return board.map(row => row.map(cell => cell ? { ...cell } : null));
+  }
+
+  static minimax(board, depth, alpha, beta, isMaximizing, moveHistory, castlingRights) {
+    if (depth === 0) return ChessAI.evaluateBoard(board);
+    const color = isMaximizing ? 'white' : 'black';
+    const moves = ChessAI.getAllValidMoves(board, color, moveHistory, castlingRights);
+    if (moves.length === 0) return isMaximizing ? -Infinity : Infinity;
+
+    if (isMaximizing) {
+      let maxEval = -Infinity;
+      for (const move of moves) {
+        const newBoard = ChessAI.cloneBoard(board);
+        ChessRules.movePiece(newBoard, move.from, move.to, move.moveResult);
+        const eval_ = ChessAI.minimax(newBoard, depth - 1, alpha, beta, false, moveHistory, castlingRights);
+        maxEval = Math.max(maxEval, eval_);
+        alpha = Math.max(alpha, eval_);
+        if (beta <= alpha) break;
+      }
+      return maxEval;
+    } else {
+      let minEval = Infinity;
+      for (const move of moves) {
+        const newBoard = ChessAI.cloneBoard(board);
+        ChessRules.movePiece(newBoard, move.from, move.to, move.moveResult);
+        const eval_ = ChessAI.minimax(newBoard, depth - 1, alpha, beta, true, moveHistory, castlingRights);
+        minEval = Math.min(minEval, eval_);
+        beta = Math.min(beta, eval_);
+        if (beta <= alpha) break;
+      }
+      return minEval;
+    }
+  }
+
+  static getBestMove(board, color, difficulty, moveHistory, castlingRights) {
+    const moves = ChessAI.getAllValidMoves(board, color, moveHistory, castlingRights);
+    if (moves.length === 0) return null;
+
+    if (difficulty === 'easy') {
+      return moves[Math.floor(Math.random() * moves.length)];
+    }
+
+    const depth = difficulty === 'hard' ? 3 : 2;
+    const isMaximizing = color === 'white';
+
+    // 캡처 이동 우선 정렬
+    moves.sort((a, b) => {
+      const aCapture = board[a.to[0]][a.to[1]] ? 1 : 0;
+      const bCapture = board[b.to[0]][b.to[1]] ? 1 : 0;
+      return bCapture - aCapture;
+    });
+
+    let bestMove = null;
+    let bestEval = isMaximizing ? -Infinity : Infinity;
+
+    for (const move of moves) {
+      const capturedPiece = board[move.to[0]][move.to[1]];
+      if (capturedPiece && capturedPiece.type === 'king') return move;
+
+      const newBoard = ChessAI.cloneBoard(board);
+      ChessRules.movePiece(newBoard, move.from, move.to, move.moveResult);
+      const newHistory = [...moveHistory, {
+        piece: board[move.from[0]][move.from[1]]?.type || 'pawn',
+        from: move.from, to: move.to, special: move.moveResult.special
+      }];
+      const eval_ = ChessAI.minimax(newBoard, depth - 1, -Infinity, Infinity, !isMaximizing, newHistory, castlingRights);
+      if (isMaximizing ? eval_ > bestEval : eval_ < bestEval) {
+        bestEval = eval_;
+        bestMove = move;
+      }
+    }
+
+    return bestMove || moves[0];
   }
 }
 
