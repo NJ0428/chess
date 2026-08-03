@@ -7,6 +7,7 @@ const SQLiteStore = require('connect-sqlite3')(session);
 const bcrypt = require('bcrypt');
 const db = require('./server/database.js'); // 데이터베이스 설정 가져오기
 const { EloRatingSystem, GameStatsManager } = require('./server/gameStats.js');
+const initStockfish = require('stockfish');
 
 const app = express();
 const server = http.createServer(app);
@@ -354,16 +355,21 @@ class ChessGame {
     console.log(`AI 게임 생성: ${roomId}, 난이도: ${difficulty}`);
   }
 
-  makeAIMove(roomId) {
+  async makeAIMove(roomId) {
     const room = this.games[roomId];
     if (!room || !room.isAI || room.status !== 'playing' || room.currentTurn !== room.aiColor) return;
-    const aiMove = ChessAI.getBestMove(
+
+    const aiMove = await stockfishAI.getBestMove(
       room.board,
       room.aiColor,
       room.aiDifficulty,
       room.moveHistory || [],
       room.castlingRights
     );
+
+    // 방 상태 재확인 (비동기 대기 중 게임 종료 가능성)
+    if (!room || room.status !== 'playing' || room.currentTurn !== room.aiColor) return;
+
     if (!aiMove) {
       io.to(room.players.white).emit('gameOver', {
         winner: room.aiColor === 'black' ? 'white' : 'black',
@@ -1213,117 +1219,143 @@ class ChessRules {
   }
 }
 
-// AI 체스 엔진
-class ChessAI {
-  static getAllValidMoves(board, color, moveHistory, castlingRights) {
-    const moves = [];
+// Stockfish AI 엔진
+class StockfishAI {
+  constructor() {
+    this.engine = null;
+    this.ready = false;
+    this.init();
+  }
+
+  init() {
+    initStockfish('lite-single', (err, engine) => {
+      if (err) {
+        console.error('Stockfish 초기화 실패:', err);
+        return;
+      }
+      this.engine = engine;
+      this.ready = true;
+      this.engine.listener = () => {};
+      this.engine.sendCommand('uci');
+      this.engine.sendCommand('isready');
+      console.log('Stockfish 엔진 초기화 완료');
+    });
+  }
+
+  // 보드 → FEN 변환
+  boardToFen(board, currentTurn, castlingRights, moveHistory) {
+    const pieceMap = { pawn: 'p', rook: 'r', knight: 'n', bishop: 'b', queen: 'q', king: 'k' };
+    let fen = '';
+
     for (let row = 0; row < 8; row++) {
+      let empty = 0;
       for (let col = 0; col < 8; col++) {
         const piece = board[row][col];
-        if (!piece || piece.color !== color) continue;
-        for (let toRow = 0; toRow < 8; toRow++) {
-          for (let toCol = 0; toCol < 8; toCol++) {
-            const result = ChessRules.isValidMove(board, [row, col], [toRow, toCol], color, moveHistory, castlingRights);
-            if (result.valid) {
-              moves.push({ from: [row, col], to: [toRow, toCol], moveResult: result });
-            }
-          }
+        if (!piece) {
+          empty++;
+        } else {
+          if (empty > 0) { fen += empty; empty = 0; }
+          const ch = pieceMap[piece.type] || 'p';
+          fen += piece.color === 'white' ? ch.toUpperCase() : ch;
         }
       }
+      if (empty > 0) fen += empty;
+      if (row < 7) fen += '/';
     }
-    return moves;
-  }
 
-  static evaluateBoard(board) {
-    const values = { pawn: 100, knight: 320, bishop: 330, rook: 500, queen: 900, king: 20000 };
-    let score = 0;
-    for (let row = 0; row < 8; row++) {
-      for (let col = 0; col < 8; col++) {
-        const piece = board[row][col];
-        if (!piece) continue;
-        const val = values[piece.type] || 0;
-        score += piece.color === 'white' ? val : -val;
+    // 턴
+    fen += ' ' + (currentTurn === 'white' ? 'w' : 'b');
+
+    // 캐슬링 권한
+    let castling = '';
+    if (castlingRights?.white?.kingSide)  castling += 'K';
+    if (castlingRights?.white?.queenSide) castling += 'Q';
+    if (castlingRights?.black?.kingSide)  castling += 'k';
+    if (castlingRights?.black?.queenSide) castling += 'q';
+    fen += ' ' + (castling || '-');
+
+    // 앙파상 타겟
+    let enPassant = '-';
+    if (moveHistory && moveHistory.length > 0) {
+      const last = moveHistory[moveHistory.length - 1];
+      if (last.special === 'double_move') {
+        const file = String.fromCharCode(97 + last.to[1]);
+        const rank = last.piece === 'pawn' && last.color === 'white' ? 3 : 6;
+        enPassant = file + rank;
       }
     }
-    return score;
+    fen += ' ' + enPassant;
+
+    // 하프무브/풀무브 (간단히 고정값)
+    fen += ' 0 1';
+    return fen;
   }
 
-  static cloneBoard(board) {
-    return board.map(row => row.map(cell => cell ? { ...cell } : null));
+  // UCI 이동(e.g. "e2e4") → 내부 형식 변환
+  uciToMove(uciMove, board, color, moveHistory, castlingRights) {
+    const fromCol = uciMove.charCodeAt(0) - 97;
+    const fromRow = 8 - parseInt(uciMove[1]);
+    const toCol   = uciMove.charCodeAt(2) - 97;
+    const toRow   = 8 - parseInt(uciMove[3]);
+
+    const from = [fromRow, fromCol];
+    const to   = [toRow, toCol];
+    const moveResult = ChessRules.isValidMove(board, from, to, color, moveHistory, castlingRights);
+    if (!moveResult.valid) return null;
+    return { from, to, moveResult };
   }
 
-  static minimax(board, depth, alpha, beta, isMaximizing, moveHistory, castlingRights) {
-    if (depth === 0) return ChessAI.evaluateBoard(board);
-    const color = isMaximizing ? 'white' : 'black';
-    const moves = ChessAI.getAllValidMoves(board, color, moveHistory, castlingRights);
-    if (moves.length === 0) return isMaximizing ? -Infinity : Infinity;
-
-    if (isMaximizing) {
-      let maxEval = -Infinity;
-      for (const move of moves) {
-        const newBoard = ChessAI.cloneBoard(board);
-        ChessRules.movePiece(newBoard, move.from, move.to, move.moveResult);
-        const eval_ = ChessAI.minimax(newBoard, depth - 1, alpha, beta, false, moveHistory, castlingRights);
-        maxEval = Math.max(maxEval, eval_);
-        alpha = Math.max(alpha, eval_);
-        if (beta <= alpha) break;
-      }
-      return maxEval;
-    } else {
-      let minEval = Infinity;
-      for (const move of moves) {
-        const newBoard = ChessAI.cloneBoard(board);
-        ChessRules.movePiece(newBoard, move.from, move.to, move.moveResult);
-        const eval_ = ChessAI.minimax(newBoard, depth - 1, alpha, beta, true, moveHistory, castlingRights);
-        minEval = Math.min(minEval, eval_);
-        beta = Math.min(beta, eval_);
-        if (beta <= alpha) break;
-      }
-      return minEval;
+  // 난이도 → Stockfish 설정
+  getDifficultySettings(difficulty) {
+    switch (difficulty) {
+      case 'easy':   return { skillLevel: 0,  depth: 1 };
+      case 'hard':   return { skillLevel: 20, depth: 15 };
+      default:       return { skillLevel: 5,  depth: 5 };
     }
   }
 
-  static getBestMove(board, color, difficulty, moveHistory, castlingRights) {
-    const moves = ChessAI.getAllValidMoves(board, color, moveHistory, castlingRights);
-    if (moves.length === 0) return null;
+  getBestMove(board, color, difficulty, moveHistory, castlingRights) {
+    return new Promise((resolve) => {
+      if (!this.ready || !this.engine) {
+        resolve(null);
+        return;
+      }
 
-    if (difficulty === 'easy') {
-      return moves[Math.floor(Math.random() * moves.length)];
-    }
+      const fen = this.boardToFen(board, color, castlingRights, moveHistory);
+      const { skillLevel, depth } = this.getDifficultySettings(difficulty);
+      let resolved = false;
 
-    const depth = difficulty === 'hard' ? 3 : 2;
-    const isMaximizing = color === 'white';
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          this.engine.listener = () => {};
+          resolve(null);
+        }
+      }, 5000);
 
-    // 캡처 이동 우선 정렬
-    moves.sort((a, b) => {
-      const aCapture = board[a.to[0]][a.to[1]] ? 1 : 0;
-      const bCapture = board[b.to[0]][b.to[1]] ? 1 : 0;
-      return bCapture - aCapture;
+      this.engine.listener = (line) => {
+        if (line.startsWith('bestmove') && !resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          this.engine.listener = () => {};
+
+          const parts = line.split(' ');
+          const uciMove = parts[1];
+          if (!uciMove || uciMove === '(none)') { resolve(null); return; }
+
+          const move = this.uciToMove(uciMove, board, color, moveHistory, castlingRights);
+          resolve(move);
+        }
+      };
+
+      this.engine.sendCommand(`setoption name Skill Level value ${skillLevel}`);
+      this.engine.sendCommand(`position fen ${fen}`);
+      this.engine.sendCommand(`go depth ${depth}`);
     });
-
-    let bestMove = null;
-    let bestEval = isMaximizing ? -Infinity : Infinity;
-
-    for (const move of moves) {
-      const capturedPiece = board[move.to[0]][move.to[1]];
-      if (capturedPiece && capturedPiece.type === 'king') return move;
-
-      const newBoard = ChessAI.cloneBoard(board);
-      ChessRules.movePiece(newBoard, move.from, move.to, move.moveResult);
-      const newHistory = [...moveHistory, {
-        piece: board[move.from[0]][move.from[1]]?.type || 'pawn',
-        from: move.from, to: move.to, special: move.moveResult.special
-      }];
-      const eval_ = ChessAI.minimax(newBoard, depth - 1, -Infinity, Infinity, !isMaximizing, newHistory, castlingRights);
-      if (isMaximizing ? eval_ > bestEval : eval_ < bestEval) {
-        bestEval = eval_;
-        bestMove = move;
-      }
-    }
-
-    return bestMove || moves[0];
   }
 }
+
+const stockfishAI = new StockfishAI();
 
 // 게임 인스턴스 생성
 const chessGame = new ChessGame();
