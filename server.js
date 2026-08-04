@@ -386,14 +386,14 @@ class ChessGame {
   }
 
   handleCreateRoom(socket, data) {
-    const { roomId, playerName } = data;
+    const { roomId, playerName, timeControl } = data;
     if (this.games[roomId]) {
       socket.emit('error', '이미 존재하는 방 아이디입니다.');
       return;
     }
     socket.join(roomId);
-    this.games[roomId] = this.createNewRoom(socket.id, playerName);
-    socket.emit('roomCreated', { roomId, color: 'white', chatHistory: [] });
+    this.games[roomId] = this.createNewRoom(socket.id, playerName, timeControl);
+    socket.emit('roomCreated', { roomId, color: 'white', chatHistory: [], timeControl: this.games[roomId].timeControl });
     console.log(`방 생성: ${roomId}`);
     this.broadcastRoomList();
   }
@@ -431,7 +431,9 @@ class ChessGame {
         board: room.board,
         turn: room.currentTurn,
         whitePlayer: room.playerNames.white,
-        blackPlayer: room.playerNames.black
+        blackPlayer: room.playerNames.black,
+        timeControl: room.timeControl,
+        timers: room.timers
       });
       if (this.spectators[roomId]) {
         for (const spectatorId in this.spectators[roomId]) {
@@ -439,10 +441,13 @@ class ChessGame {
             board: room.board,
             turn: room.currentTurn,
             whitePlayer: room.playerNames.white,
-            blackPlayer: room.playerNames.black
+            blackPlayer: room.playerNames.black,
+            timeControl: room.timeControl,
+            timers: room.timers
           });
         }
       }
+      this.startPlayerTimer(roomId);
       try {
         const getPlayerIds = `SELECT id, nickname FROM users WHERE nickname IN (?, ?)`;
         db.all(getPlayerIds, [room.playerNames.white, room.playerNames.black], async (err, players) => {
@@ -502,7 +507,9 @@ class ChessGame {
       whitePlayer: room.playerNames.white,
       blackPlayer: room.playerNames.black,
       moveHistory: room.moveHistory || [],
-      spectatorChatHistory: room.spectatorChatHistory || []
+      spectatorChatHistory: room.spectatorChatHistory || [],
+      timeControl: room.timeControl,
+      timers: room.timers
     });
     const spectatorCount = Object.keys(this.spectators[roomId]).length;
     io.to(roomId).emit('spectatorJoined', {
@@ -538,6 +545,10 @@ class ChessGame {
   handleRestartGame(socket, roomId) {
     const room = this.games[roomId];
     if (!room) return;
+    if (room.timerInterval) {
+      clearInterval(room.timerInterval);
+      room.timerInterval = null;
+    }
     room.board = ChessRules.initializeBoard();
     room.currentTurn = 'white';
     room.status = 'playing';
@@ -546,14 +557,22 @@ class ChessGame {
       white: { kingSide: true, queenSide: true },
       black: { kingSide: true, queenSide: true }
     };
+    if (room.timeControl && room.timeControl.enabled) {
+      room.timers = { white: room.timeControl.initial, black: room.timeControl.initial };
+      room.lastMoveTime = null;
+    }
     io.to(room.players.white).emit('gameRestarted', {
       board: room.board,
-      turn: room.currentTurn
+      turn: room.currentTurn,
+      timeControl: room.timeControl,
+      timers: room.timers
     });
     if (room.players.black) {
       io.to(room.players.black).emit('gameRestarted', {
         board: room.board,
-        turn: room.currentTurn
+        turn: room.currentTurn,
+        timeControl: room.timeControl,
+        timers: room.timers
       });
     }
     if (this.spectators[roomId]) {
@@ -564,6 +583,7 @@ class ChessGame {
         });
       }
     }
+    this.startPlayerTimer(roomId);
   }
 
   handleLeaveRoom(socket, roomId) {
@@ -572,6 +592,10 @@ class ChessGame {
     const isWhitePlayer = room.players.white === socket.id;
     const isBlackPlayer = room.players.black === socket.id;
     if (isWhitePlayer || isBlackPlayer) {
+      if (room.timerInterval) {
+        clearInterval(room.timerInterval);
+        room.timerInterval = null;
+      }
       socket.leave(roomId);
       if (isWhitePlayer && room.players.black) {
         room.players.white = room.players.black;
@@ -710,7 +734,8 @@ class ChessGame {
     console.log(`[관전자 채팅] ${roomId} - ${spectatorName}: ${message}`);
   }
 
-  createNewRoom(socketId, playerName) {
+  createNewRoom(socketId, playerName, timeControl = null) {
+    const tc = (timeControl && timeControl.enabled) ? timeControl : { enabled: false };
     return {
       board: ChessRules.initializeBoard(),
       players: { white: socketId, black: null },
@@ -725,7 +750,11 @@ class ChessGame {
       castlingRights: {
         white: { kingSide: true, queenSide: true },
         black: { kingSide: true, queenSide: true }
-      }
+      },
+      timeControl: tc,
+      timers: tc.enabled ? { white: tc.initial, black: tc.initial } : null,
+      timerInterval: null,
+      lastMoveTime: null
     };
   }
 
@@ -764,6 +793,10 @@ class ChessGame {
 
   async endGame(roomId, gameResult) {
     const room = this.games[roomId];
+    if (room.timerInterval) {
+      clearInterval(room.timerInterval);
+      room.timerInterval = null;
+    }
     room.status = 'finished';
     io.to(room.players.white).emit('boardUpdate', {
       board: room.board,
@@ -810,6 +843,7 @@ class ChessGame {
   }
 
   continueTurn(roomId, room) {
+    this.stopPlayerTimer(roomId);
     room.currentTurn = room.currentTurn === 'white' ? 'black' : 'white';
     const moveDetails = {
       from: room.moveHistory[room.moveHistory.length - 1].from,
@@ -839,6 +873,7 @@ class ChessGame {
         });
       }
     }
+    this.startPlayerTimer(roomId);
   }
 
   updateCastlingRights(room, from, piece) {
@@ -860,6 +895,92 @@ class ChessGame {
         if (row === 0 && col === 7) room.castlingRights.black.kingSide = false;
       }
     }
+  }
+
+  startPlayerTimer(roomId) {
+    const room = this.games[roomId];
+    if (!room || !room.timeControl || !room.timeControl.enabled) return;
+
+    room.lastMoveTime = Date.now();
+
+    if (room.timerInterval) clearInterval(room.timerInterval);
+
+    room.timerInterval = setInterval(() => {
+      const r = this.games[roomId];
+      if (!r || r.status !== 'playing') {
+        if (r && r.timerInterval) clearInterval(r.timerInterval);
+        return;
+      }
+
+      const elapsed = Date.now() - r.lastMoveTime;
+      const color = r.currentTurn;
+      const remaining = r.timers[color] - elapsed;
+
+      const timerData = {
+        white: color === 'white' ? Math.max(0, remaining) : r.timers.white,
+        black: color === 'black' ? Math.max(0, remaining) : r.timers.black,
+        activeColor: color
+      };
+
+      io.to(r.players.white).emit('timerUpdate', timerData);
+      if (r.players.black && r.players.black !== 'AI') {
+        io.to(r.players.black).emit('timerUpdate', timerData);
+      }
+      if (this.spectators[roomId]) {
+        for (const sid in this.spectators[roomId]) io.to(sid).emit('timerUpdate', timerData);
+      }
+
+      if (remaining <= 0) {
+        clearInterval(r.timerInterval);
+        r.timerInterval = null;
+        r.timers[color] = 0;
+        this.handleTimeOut(roomId, color);
+      }
+    }, 200);
+  }
+
+  stopPlayerTimer(roomId) {
+    const room = this.games[roomId];
+    if (!room || !room.timeControl || !room.timeControl.enabled || !room.lastMoveTime) return;
+
+    if (room.timerInterval) {
+      clearInterval(room.timerInterval);
+      room.timerInterval = null;
+    }
+
+    const elapsed = Date.now() - room.lastMoveTime;
+    const color = room.currentTurn;
+    room.timers[color] = Math.max(0, room.timers[color] - elapsed);
+
+    if (room.timeControl.increment > 0) {
+      room.timers[color] += room.timeControl.increment;
+    }
+
+    room.lastMoveTime = null;
+  }
+
+  async handleTimeOut(roomId, timedOutColor) {
+    const room = this.games[roomId];
+    if (!room || room.status !== 'playing') return;
+
+    const winner = timedOutColor === 'white' ? 'black' : 'white';
+    const message = `${timedOutColor === 'white' ? '백' : '흑'}의 시간이 초과되었습니다!`;
+
+    room.status = 'finished';
+
+    io.to(room.players.white).emit('gameOver', { winner, message });
+    if (room.players.black && room.players.black !== 'AI') {
+      io.to(room.players.black).emit('gameOver', { winner, message });
+    }
+    if (this.spectators[roomId]) {
+      for (const sid in this.spectators[roomId]) {
+        io.to(sid).emit('gameEnded', {
+          reason: `${winner === 'white' ? '백' : '흑'}이 승리했습니다! ${message}`
+        });
+      }
+    }
+
+    await this.recordGameEnd(roomId, winner, 'timeout');
   }
 
   async recordGameEnd(roomId, winner, resultType) {

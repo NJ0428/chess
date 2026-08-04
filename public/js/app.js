@@ -49,6 +49,8 @@ const gameState = {
   isSpectating: false,
   isAIGame: false,
   spectatorName: '',
+  timeControl: null,
+  timers: null,
   audioLoaded: {
     check: false,
     checkmate: false,
@@ -125,6 +127,13 @@ const elements = {
   chessRulesPanel: document.getElementById('chessRulesPanel'),
   closeRulesBtn: document.getElementById('closeRulesBtn'),
 
+  // 타이머
+  timeModeSelect: document.getElementById('timeModeSelect'),
+  incrementGroup: document.getElementById('incrementGroup'),
+  incrementSelect: document.getElementById('incrementSelect'),
+  whiteTimer: document.getElementById('whiteTimer'),
+  blackTimer: document.getElementById('blackTimer'),
+
   // 오디오
   audio: {
     check: document.getElementById('check-audio'),
@@ -198,6 +207,52 @@ class AudioManager {
       }
     }
     return null;
+  }
+}
+
+// 타이머 관리 클래스
+class TimerManager {
+  static formatTime(ms) {
+    if (ms <= 0) return '0:00';
+    const totalSeconds = Math.ceil(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  static update(data) {
+    const { white, black, activeColor } = data;
+    if (elements.whiteTimer) {
+      elements.whiteTimer.textContent = this.formatTime(white);
+      elements.whiteTimer.className = 'player-timer' + (activeColor === 'white' ? ' active' : '');
+      if (white > 0 && white < 30000) elements.whiteTimer.classList.add('low-time');
+    }
+    if (elements.blackTimer) {
+      elements.blackTimer.textContent = this.formatTime(black);
+      elements.blackTimer.className = 'player-timer' + (activeColor === 'black' ? ' active' : '');
+      if (black > 0 && black < 30000) elements.blackTimer.classList.add('low-time');
+    }
+  }
+
+  static show() {
+    if (elements.whiteTimer) elements.whiteTimer.style.display = 'inline-block';
+    if (elements.blackTimer) elements.blackTimer.style.display = 'inline-block';
+  }
+
+  static hide() {
+    if (elements.whiteTimer) elements.whiteTimer.style.display = 'none';
+    if (elements.blackTimer) elements.blackTimer.style.display = 'none';
+  }
+
+  static init(timeControl, timers) {
+    gameState.timeControl = timeControl;
+    gameState.timers = timers;
+    if (timeControl && timeControl.enabled && timers) {
+      this.show();
+      this.update({ white: timers.white, black: timers.black, activeColor: 'white' });
+    } else {
+      this.hide();
+    }
   }
 }
 
@@ -309,8 +364,14 @@ class RoomManager {
       return;
     }
 
+    const timeModes = { blitz: 3 * 60 * 1000, rapid: 10 * 60 * 1000, classic: 30 * 60 * 1000 };
+    const modeValue = elements.timeModeSelect ? elements.timeModeSelect.value : 'none';
+    const timeControl = modeValue !== 'none'
+      ? { enabled: true, initial: timeModes[modeValue], increment: elements.incrementSelect ? parseInt(elements.incrementSelect.value) : 0 }
+      : { enabled: false };
+
     gameState.playerName = playerName;
-    socket.emit('createRoom', { roomId, playerName: playerName });
+    socket.emit('createRoom', { roomId, playerName: playerName, timeControl });
   }
 
   static joinRoom(roomId) {
@@ -337,10 +398,13 @@ class RoomManager {
       gameBoard: null,
       selectedSquare: null,
       myTurn: false,
-      isAIGame: false
+      isAIGame: false,
+      timeControl: null,
+      timers: null
     });
 
     UIManager.showScreen('lobby');
+    TimerManager.hide();
     ChatManager.clearChat();
     // 채팅 카드 복원
     const chatCard = document.getElementById('chatCard');
@@ -916,6 +980,15 @@ class EventManager {
       elements.closeRulesBtn.addEventListener('click', EventManager.closeRulesPanel);
     }
 
+    // 시간 모드 변경 이벤트
+    if (elements.timeModeSelect) {
+      elements.timeModeSelect.addEventListener('change', () => {
+        if (elements.incrementGroup) {
+          elements.incrementGroup.style.display = elements.timeModeSelect.value !== 'none' ? 'block' : 'none';
+        }
+      });
+    }
+
     // 채팅 이벤트 초기화
     ChatManager.init();
     SpectatorChatManager.init();
@@ -993,6 +1066,10 @@ class EventManager {
       UIManager.showNotification(`${data.opponentName}님이 게임에 참가했습니다.`);
     });
 
+    socket.on('timerUpdate', (data) => {
+      TimerManager.update(data);
+    });
+
     socket.on('gameStart', (data) => {
       console.log('게임 시작:', data);
       UIManager.showScreen('gameBoard');
@@ -1005,6 +1082,8 @@ class EventManager {
 
       elements.whitePlayerInfo.querySelector('span').textContent = `백: ${data.whitePlayer}`;
       elements.blackPlayerInfo.querySelector('span').textContent = `흑: ${data.blackPlayer}`;
+
+      TimerManager.init(data.timeControl, data.timers);
 
       if (gameState.myTurn) {
         UIManager.showNotification('게임이 시작되었습니다. 당신의 턴입니다.');
@@ -1079,16 +1158,16 @@ class EventManager {
     });
 
     socket.on('gameRestarted', (data) => {
-      // 턴 정보를 먼저 업데이트
       gameState.currentTurn = data.turn;
       gameState.myTurn = gameState.playerColor === data.turn;
 
-      // 보드 렌더링 (이때 올바른 턴 정보로 UI 업데이트됨)
       BoardRenderer.render(data.board);
 
       elements.gameStatusEl.textContent = '';
       elements.gameStatusEl.className = '';
       elements.restartBtn.style.display = 'none';
+
+      TimerManager.init(data.timeControl, data.timers);
 
       UIManager.showNotification('게임이 재시작되었습니다.');
     });

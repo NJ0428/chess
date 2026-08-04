@@ -6005,3 +6005,41 @@ body.keyboard-nav *:focus {
     font-size: 1rem;
   }
 }
+
+/* =====================================================
+   TIMER STYLES
+===================================================== */
+.player-timer {
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background-color: var(--bg-secondary, #2a2a4a);
+  color: var(--text-secondary, #a0a0c0);
+  border: 2px solid transparent;
+  margin-left: 8px;
+  min-width: 52px;
+  text-align: center;
+  display: inline-block;
+  transition: all 0.3s ease;
+  vertical-align: middle;
+}
+
+.player-timer.active {
+  border-color: var(--primary-color, #6c63ff);
+  background-color: var(--primary-color, #6c63ff);
+  color: #fff;
+}
+
+.player-timer.low-time {
+  border-color: #e74c3c !important;
+  background-color: #e74c3c !important;
+  color: #fff !important;
+  animation: timerFlash 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes timerFlash {
+  from { opacity: 1; }
+  to   { opacity: 0.6; }
+}
