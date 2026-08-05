@@ -265,6 +265,9 @@
                 <button id="restartBtn" class="btn btn-primary" style="display:none;">
                   <i class="fas fa-redo"></i> 다시 시작
                 </button>
+                <button id="replayBtn" class="btn btn-outline" style="display:none;">
+                  <i class="fas fa-film"></i> 기보 재생
+                </button>
                 <button id="leaveGameBtn" class="btn btn-outline">
                   <i class="fas fa-sign-out-alt"></i> 나가기
                 </button>
@@ -309,6 +312,49 @@
 
   <!-- 알림 -->
   <div id="notification" class="game-notification" style="display:none;"></div>
+
+  <!-- 기보 재생 모달 -->
+  <div id="replayModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:1000;overflow-y:auto;">
+    <div style="max-width:900px;margin:40px auto;background:var(--bg-card);border-radius:var(--border-radius-md);padding:24px;border:1px solid var(--border-color);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h3 style="margin:0;"><i class="fas fa-film"></i> 기보 재생</h3>
+        <button id="closeReplayBtn" class="btn btn-sm btn-outline"><i class="fas fa-times"></i> 닫기</button>
+      </div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
+        <!-- 재생판 -->
+        <div style="flex:0 0 auto;">
+          <div id="replayBoard" class="chess-board"></div>
+          <div style="text-align:center;margin-top:10px;color:var(--text-secondary);font-size:0.9rem;" id="replayPositionLabel">시작 국면</div>
+        </div>
+        <!-- 컨트롤 패널 -->
+        <div style="flex:1;min-width:220px;">
+          <!-- 이동 컨트롤 버튼 -->
+          <div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px;flex-wrap:wrap;">
+            <button id="replayFirstBtn" class="btn btn-outline btn-sm" title="처음으로"><i class="fas fa-step-backward"></i></button>
+            <button id="replayPrevBtn" class="btn btn-outline btn-sm" title="이전 수"><i class="fas fa-chevron-left"></i></button>
+            <button id="replayAutoPlayBtn" class="btn btn-primary btn-sm"><i class="fas fa-play"></i> 자동재생</button>
+            <button id="replayNextBtn" class="btn btn-outline btn-sm" title="다음 수"><i class="fas fa-chevron-right"></i></button>
+            <button id="replayLastBtn" class="btn btn-outline btn-sm" title="마지막으로"><i class="fas fa-step-forward"></i></button>
+          </div>
+          <!-- 속도 조절 -->
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;justify-content:center;">
+            <label style="color:var(--text-secondary);font-size:0.85rem;">재생 속도:</label>
+            <select id="replaySpeedSelect" style="padding:6px 10px;border:1px solid var(--border-color);border-radius:var(--border-radius-sm);font-size:0.85rem;background:var(--bg-primary);color:var(--text-primary);">
+              <option value="2000">느리게</option>
+              <option value="1000" selected>보통</option>
+              <option value="500">빠르게</option>
+              <option value="200">매우 빠르게</option>
+            </select>
+          </div>
+          <!-- 기보 목록 -->
+          <div style="background:var(--bg-secondary);border-radius:var(--border-radius-sm);padding:10px;">
+            <div style="color:var(--text-secondary);font-size:0.8rem;margin-bottom:8px;font-weight:600;">수 목록 (클릭하면 해당 국면으로 이동)</div>
+            <div id="replayMoveList" style="max-height:300px;overflow-y:auto;display:grid;grid-template-columns:auto 1fr 1fr;gap:4px;font-size:0.85rem;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- 오디오 -->
   <audio id="check-audio" src="sounds/check.mp3" preload="auto"></audio>

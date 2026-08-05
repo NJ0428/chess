@@ -373,7 +373,9 @@ class ChessGame {
     if (!aiMove) {
       io.to(room.players.white).emit('gameOver', {
         winner: room.aiColor === 'black' ? 'white' : 'black',
-        message: 'AI가 이동할 수 없습니다. 스테일메이트!'
+        message: 'AI가 이동할 수 없습니다. 스테일메이트!',
+        moveHistory: room.moveHistory || [],
+        boardHistory: room.boardHistory || []
       });
       return;
     }
@@ -553,6 +555,7 @@ class ChessGame {
     room.currentTurn = 'white';
     room.status = 'playing';
     room.moveHistory = [];
+    room.boardHistory = [JSON.parse(JSON.stringify(room.board))];
     room.castlingRights = {
       white: { kingSide: true, queenSide: true },
       black: { kingSide: true, queenSide: true }
@@ -745,6 +748,7 @@ class ChessGame {
       creatorName: playerName || '익명',
       createdAt: new Date().toISOString(),
       moveHistory: [],
+      boardHistory: [JSON.parse(JSON.stringify(ChessRules.initializeBoard()))],
       chatHistory: [],
       spectatorChatHistory: [],
       castlingRights: {
@@ -772,6 +776,8 @@ class ChessGame {
       message = `${targetPiece.color === 'white' ? '백' : '흑'} 왕이 잡혔습니다!`;
     }
     const moveDetails = ChessRules.movePiece(room.board, from, to, moveResult);
+    if (!room.boardHistory) room.boardHistory = [];
+    room.boardHistory.push(JSON.parse(JSON.stringify(room.board)));
     if (!room.moveHistory) room.moveHistory = [];
     room.moveHistory.push({
       piece: movingPiece.type,
@@ -823,14 +829,17 @@ class ChessGame {
       }
     }
     await this.recordGameEnd(roomId, gameResult.winner, 'checkmate');
+    const replayData = { moveHistory: room.moveHistory || [], boardHistory: room.boardHistory || [] };
     io.to(room.players.white).emit('gameOver', {
       winner: gameResult.winner,
-      message: gameResult.message
+      message: gameResult.message,
+      ...replayData
     });
     if (room.players.black) {
       io.to(room.players.black).emit('gameOver', {
         winner: gameResult.winner,
-        message: gameResult.message
+        message: gameResult.message,
+        ...replayData
       });
     }
     if (this.spectators[roomId]) {
@@ -968,9 +977,10 @@ class ChessGame {
 
     room.status = 'finished';
 
-    io.to(room.players.white).emit('gameOver', { winner, message });
+    const timeoutReplayData = { moveHistory: room.moveHistory || [], boardHistory: room.boardHistory || [] };
+    io.to(room.players.white).emit('gameOver', { winner, message, ...timeoutReplayData });
     if (room.players.black && room.players.black !== 'AI') {
-      io.to(room.players.black).emit('gameOver', { winner, message });
+      io.to(room.players.black).emit('gameOver', { winner, message, ...timeoutReplayData });
     }
     if (this.spectators[roomId]) {
       for (const sid in this.spectators[roomId]) {

@@ -127,6 +127,20 @@ const elements = {
   chessRulesPanel: document.getElementById('chessRulesPanel'),
   closeRulesBtn: document.getElementById('closeRulesBtn'),
 
+  // 기보 재생
+  replayBtn: document.getElementById('replayBtn'),
+  replayModal: document.getElementById('replayModal'),
+  closeReplayBtn: document.getElementById('closeReplayBtn'),
+  replayBoard: document.getElementById('replayBoard'),
+  replayPositionLabel: document.getElementById('replayPositionLabel'),
+  replayFirstBtn: document.getElementById('replayFirstBtn'),
+  replayPrevBtn: document.getElementById('replayPrevBtn'),
+  replayNextBtn: document.getElementById('replayNextBtn'),
+  replayLastBtn: document.getElementById('replayLastBtn'),
+  replayAutoPlayBtn: document.getElementById('replayAutoPlayBtn'),
+  replaySpeedSelect: document.getElementById('replaySpeedSelect'),
+  replayMoveList: document.getElementById('replayMoveList'),
+
   // 타이머
   timeModeSelect: document.getElementById('timeModeSelect'),
   incrementGroup: document.getElementById('incrementGroup'),
@@ -1155,6 +1169,11 @@ class EventManager {
       elements.gameStatusEl.textContent = `게임 종료: ${data.message}`;
       elements.gameStatusEl.className = data.winner === gameState.playerColor ? 'win-status' : 'lose-status';
       elements.restartBtn.style.display = 'block';
+
+      if (data.moveHistory && data.boardHistory && data.moveHistory.length > 0) {
+        ReplayManager.setData(data.moveHistory, data.boardHistory);
+        if (elements.replayBtn) elements.replayBtn.style.display = 'block';
+      }
     });
 
     socket.on('gameRestarted', (data) => {
