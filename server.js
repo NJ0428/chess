@@ -248,6 +248,54 @@ app.get('/api/stats/achievements', async (req, res) => {
   }
 });
 
+// 테마 설정 조회
+app.get('/api/settings', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+  db.get('SELECT * FROM user_settings WHERE user_id = ?', [req.session.userId], (err, row) => {
+    if (err) return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+    if (!row) {
+      return res.json({ board_theme: 'classic', piece_theme: 'neo', show_coordinates: 1 });
+    }
+    res.json(row);
+  });
+});
+
+// 테마 설정 저장
+app.put('/api/settings', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+  const { board_theme, piece_theme, show_coordinates } = req.body;
+  const validBoardThemes = ['classic', 'wood', 'blue', 'green', 'dark', 'purple'];
+  const validPieceThemes = ['neo', 'unicode'];
+  if (board_theme && !validBoardThemes.includes(board_theme)) {
+    return res.status(400).json({ message: '유효하지 않은 보드 테마입니다.' });
+  }
+  if (piece_theme && !validPieceThemes.includes(piece_theme)) {
+    return res.status(400).json({ message: '유효하지 않은 기물 테마입니다.' });
+  }
+  const sql = `
+    INSERT INTO user_settings (user_id, board_theme, piece_theme, show_coordinates, updated_at)
+    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(user_id) DO UPDATE SET
+      board_theme = excluded.board_theme,
+      piece_theme = excluded.piece_theme,
+      show_coordinates = excluded.show_coordinates,
+      updated_at = CURRENT_TIMESTAMP
+  `;
+  db.run(sql, [
+    req.session.userId,
+    board_theme || 'classic',
+    piece_theme || 'neo',
+    show_coordinates !== undefined ? (show_coordinates ? 1 : 0) : 1
+  ], (err) => {
+    if (err) return res.status(500).json({ message: '설정 저장 실패: ' + err.message });
+    res.json({ message: '설정이 저장되었습니다.' });
+  });
+});
+
 // 체스 게임 클래스
 class ChessGame {
   constructor() {

@@ -82,6 +82,17 @@ function initializeDatabase() {
     )
   `;
 
+  const userSettingsTable = `
+    CREATE TABLE IF NOT EXISTS user_settings (
+      user_id INTEGER PRIMARY KEY,
+      board_theme TEXT DEFAULT 'classic',
+      piece_theme TEXT DEFAULT 'neo',
+      show_coordinates INTEGER DEFAULT 1,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users (id)
+    )
+  `;
+
   // 테이블들을 순차적으로 생성
   db.run(usersTable, (err) => {
     if (err) {
@@ -115,6 +126,14 @@ function initializeDatabase() {
       console.error('achievements 테이블 생성 실패:', err);
     } else {
       console.log('achievements 테이블이 성공적으로 생성되었거나 이미 존재합니다.');
+    }
+  });
+
+  db.run(userSettingsTable, (err) => {
+    if (err) {
+      console.error('user_settings 테이블 생성 실패:', err);
+    } else {
+      console.log('user_settings 테이블이 성공적으로 생성되었거나 이미 존재합니다.');
     }
   });
 }
