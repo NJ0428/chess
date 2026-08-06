@@ -603,10 +603,97 @@ section {
     transition: var(--transition-fast);
 }
 
+/* ── 보드 테마 ── */
+/* classic (default) */
 .square.white { background-color: #e4e4e4; }
 .square.black { background-color: #6c6c6c; }
 
+/* wood */
+.board-theme-wood .square.white { background-color: #f0d9b5; }
+.board-theme-wood .square.black { background-color: #b58863; }
+.board-theme-wood { border-color: #8b5e3c !important; }
+
+/* blue */
+.board-theme-blue .square.white { background-color: #dee3e6; }
+.board-theme-blue .square.black { background-color: #8ca2ad; }
+.board-theme-blue { border-color: #5b7e8e !important; }
+
+/* green */
+.board-theme-green .square.white { background-color: #ffffdd; }
+.board-theme-green .square.black { background-color: #86a666; }
+.board-theme-green { border-color: #4a7a3a !important; }
+
+/* dark */
+.board-theme-dark .square.white { background-color: #b0b0b0; }
+.board-theme-dark .square.black { background-color: #2d2d2d; }
+.board-theme-dark { border-color: #111 !important; }
+
+/* purple */
+.board-theme-purple .square.white { background-color: #e8e0f0; }
+.board-theme-purple .square.black { background-color: #7c5c9e; }
+.board-theme-purple { border-color: #5a3e7e !important; }
+
 .square.selected { background-color: var(--primary-color) !important; }
+
+/* ── 좌표 표시 ── */
+.coord-label {
+    display: none; /* 기본: 숨김 */
+    position: absolute;
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0.8;
+}
+.show-coords .coord-label { display: block; }
+.coord-file {
+    bottom: 2px;
+    right: 3px;
+}
+.coord-rank {
+    top: 2px;
+    left: 3px;
+}
+.square.white .coord-label { color: #6c6c6c; }
+.square.black .coord-label { color: #e4e4e4; }
+.board-theme-wood .square.white .coord-label  { color: #b58863; }
+.board-theme-wood .square.black .coord-label  { color: #f0d9b5; }
+.board-theme-blue .square.white .coord-label  { color: #8ca2ad; }
+.board-theme-blue .square.black .coord-label  { color: #dee3e6; }
+.board-theme-green .square.white .coord-label { color: #86a666; }
+.board-theme-green .square.black .coord-label { color: #ffffdd; }
+.board-theme-dark .square.white .coord-label  { color: #2d2d2d; }
+.board-theme-dark .square.black .coord-label  { color: #b0b0b0; }
+.board-theme-purple .square.white .coord-label { color: #7c5c9e; }
+.board-theme-purple .square.black .coord-label { color: #e8e0f0; }
+
+/* ── 유니코드 기물 테마 ── */
+.piece-unicode {
+    font-size: 2.2rem;
+    line-height: 1;
+    user-select: none;
+    position: relative;
+    z-index: 10;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+}
+
+/* ── 테마 설정 모달 색상 견본 ── */
+.theme-swatch {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 3px solid transparent;
+    transition: border-color 0.2s;
+    display: inline-grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    overflow: hidden;
+}
+.theme-swatch.active { border-color: var(--primary-color); }
+.theme-swatch:hover  { border-color: var(--primary-light); }
+.theme-swatch-cell   { width: 100%; height: 100%; }
 
 .square.valid-move::after {
     content: '';

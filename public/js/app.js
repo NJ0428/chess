@@ -127,6 +127,21 @@ const elements = {
   chessRulesPanel: document.getElementById('chessRulesPanel'),
   closeRulesBtn: document.getElementById('closeRulesBtn'),
 
+  // 테마 설정
+  openThemeBtn: document.getElementById('openThemeBtn'),
+  themeModal: document.getElementById('themeModal'),
+  closeThemeBtn: document.getElementById('closeThemeBtn'),
+  cancelThemeBtn: document.getElementById('cancelThemeBtn'),
+  saveThemeBtn: document.getElementById('saveThemeBtn'),
+  boardThemeSwatches: document.getElementById('boardThemeSwatches'),
+  pieceThemeSwatches: document.getElementById('pieceThemeSwatches'),
+  showCoordsToggle: document.getElementById('showCoordsToggle'),
+  coordsToggleTrack: document.getElementById('coordsToggleTrack'),
+  coordsToggleThumb: document.getElementById('coordsToggleThumb'),
+  boardThemeName: document.getElementById('boardThemeName'),
+  themePreviewBoard: document.getElementById('themePreviewBoard'),
+  themeSaveMsg: document.getElementById('themeSaveMsg'),
+
   // 기보 재생
   replayBtn: document.getElementById('replayBtn'),
   replayModal: document.getElementById('replayModal'),
@@ -594,6 +609,9 @@ class BoardRenderer {
       }
     }
 
+    // 테마 적용
+    ThemeManager.applyAll([boardElement]);
+
     if (!gameState.isSpectating) {
       UIManager.updateGameInfo();
       UIManager.updateBackgroundColor();
@@ -615,6 +633,23 @@ class BoardRenderer {
     square.dataset.row = actualRow;
     square.dataset.col = actualCol;
 
+    // 좌표 레이블 추가
+    const FILES = ['a','b','c','d','e','f','g','h'];
+    if (displayRow === 7) {
+      // 파일 레이블 (a-h)
+      const fileLabel = document.createElement('span');
+      fileLabel.className = 'coord-label coord-file';
+      fileLabel.textContent = FILES[actualCol];
+      square.appendChild(fileLabel);
+    }
+    if (displayCol === 0) {
+      // 랭크 레이블 (1-8)
+      const rankLabel = document.createElement('span');
+      rankLabel.className = 'coord-label coord-rank';
+      rankLabel.textContent = 8 - actualRow;
+      square.appendChild(rankLabel);
+    }
+
     // 관전 모드가 아닐 때만 클릭 이벤트 추가
     if (!isSpectating) {
       square.addEventListener('click', GameLogic.handleSquareClick);
@@ -624,12 +659,18 @@ class BoardRenderer {
   }
 
   static createPieceElement(piece) {
+    if (ThemeManager.current.pieceTheme === 'unicode') {
+      const span = document.createElement('span');
+      span.className = 'piece-unicode';
+      span.textContent = ThemeManager.PIECE_UNICODE[piece.color][piece.type];
+      span.style.color = piece.color === 'white' ? '#ffffff' : '#1a1a2e';
+      return span;
+    }
     const pieceEl = document.createElement('img');
     pieceEl.className = 'chess-piece';
     pieceEl.src = CONSTANTS.PIECE_IMAGES[piece.color][piece.type];
     pieceEl.alt = `${piece.color} ${piece.type}`;
     pieceEl.draggable = false;
-
     return pieceEl;
   }
 
@@ -1185,6 +1226,7 @@ class EventManager {
       elements.gameStatusEl.textContent = '';
       elements.gameStatusEl.className = '';
       elements.restartBtn.style.display = 'none';
+      if (elements.replayBtn) elements.replayBtn.style.display = 'none';
 
       TimerManager.init(data.timeControl, data.timers);
 
@@ -1345,6 +1387,531 @@ class EventManager {
   }
 }
 
+// 테마 관리 클래스
+class ThemeManager {
+  static BOARD_THEMES = {
+    classic: { name: '클래식', light: '#e4e4e4', dark: '#6c6c6c' },
+    wood:    { name: '나무',    light: '#f0d9b5', dark: '#b58863' },
+    blue:    { name: '블루',   light: '#dee3e6', dark: '#8ca2ad' },
+    green:   { name: '그린',   light: '#ffffdd', dark: '#86a666' },
+    dark:    { name: '다크',   light: '#b0b0b0', dark: '#2d2d2d' },
+    purple:  { name: '퍼플',   light: '#e8e0f0', dark: '#7c5c9e' },
+  };
+
+  static PIECE_UNICODE = {
+    white: { king:'♔', queen:'♕', rook:'♖', bishop:'♗', knight:'♘', pawn:'♙' },
+    black: { king:'♚', queen:'♛', rook:'♜', bishop:'♝', knight:'♞', pawn:'♟' },
+  };
+
+  // 현재 적용된 설정 (로컬 상태)
+  static current = { boardTheme: 'classic', pieceTheme: 'neo', showCoordinates: true };
+  // 모달에서 임시 선택 중인 설정
+  static pending = { boardTheme: 'classic', pieceTheme: 'neo', showCoordinates: true };
+
+  /* ── 로드 / 저장 ── */
+  static async load() {
+    // 로컬스토리지에서 먼저 적용 (즉시 반영)
+    const saved = this._fromStorage();
+    this.current = { ...saved };
+    this.pending = { ...saved };
+    this.applyAll();
+
+    // 로그인 상태라면 서버 설정으로 덮어씀
+    try {
+      const res = await fetch('/api/settings');
+      if (res.ok) {
+        const data = await res.json();
+        this.current = {
+          boardTheme: data.board_theme || 'classic',
+          pieceTheme: data.piece_theme || 'neo',
+          showCoordinates: data.show_coordinates !== 0,
+        };
+        this.pending = { ...this.current };
+        this._toStorage(this.current);
+        this.applyAll();
+      }
+    } catch (_) {}
+  }
+
+  static async save() {
+    this.current = { ...this.pending };
+    this._toStorage(this.current);
+    this.applyAll();
+
+    // 로그인 시 서버에 저장
+    try {
+      await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          board_theme: this.current.boardTheme,
+          piece_theme: this.current.pieceTheme,
+          show_coordinates: this.current.showCoordinates ? 1 : 0,
+        }),
+      });
+    } catch (_) {}
+  }
+
+  static _fromStorage() {
+    try {
+      const raw = localStorage.getItem('chessThemeSettings');
+      if (raw) return JSON.parse(raw);
+    } catch (_) {}
+    return { boardTheme: 'classic', pieceTheme: 'neo', showCoordinates: true };
+  }
+
+  static _toStorage(settings) {
+    try { localStorage.setItem('chessThemeSettings', JSON.stringify(settings)); } catch (_) {}
+  }
+
+  /* ── 적용 ── */
+  static applyAll(boards = null) {
+    const targets = boards || [elements.board, elements.spectateBoard, elements.replayBoard];
+    targets.forEach(b => { if (b) this._applyToBoard(b); });
+  }
+
+  static _applyToBoard(boardEl) {
+    // 보드 테마 CSS 클래스
+    Object.keys(this.BOARD_THEMES).forEach(t => boardEl.classList.remove(`board-theme-${t}`));
+    if (this.current.boardTheme !== 'classic') {
+      boardEl.classList.add(`board-theme-${this.current.boardTheme}`);
+    }
+    // 좌표 표시 클래스
+    boardEl.classList.toggle('show-coords', this.current.showCoordinates);
+    // 기물 테마 속성
+    boardEl.dataset.pieceTheme = this.current.pieceTheme;
+  }
+
+  /* ── 미리보기 ── */
+  static renderPreview() {
+    const board = elements.themePreviewBoard;
+    if (!board) return;
+    board.innerHTML = '';
+
+    // board 테마 적용
+    const prev = { ...this.current };
+    this.current = { ...this.pending };
+    this._applyToBoard(board);
+    this.current = prev;
+
+    const previewPieces = [
+      [null, { color:'black', type:'rook' }, null, { color:'black', type:'king' }],
+      [{ color:'black', type:'pawn' }, null, { color:'black', type:'pawn' }, null],
+      [null, { color:'white', type:'pawn' }, null, { color:'white', type:'pawn' }],
+      [{ color:'white', type:'rook' }, null, { color:'white', type:'king' }, null],
+    ];
+
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        const sq = document.createElement('div');
+        sq.className = 'square ' + ((r + c) % 2 === 0 ? 'white' : 'black');
+        const piece = previewPieces[r][c];
+        if (piece) {
+          if (this.pending.pieceTheme === 'unicode') {
+            const span = document.createElement('span');
+            span.className = 'piece-unicode';
+            span.textContent = this.PIECE_UNICODE[piece.color][piece.type];
+            span.style.color = piece.color === 'white' ? '#fff' : '#1a1a2e';
+            sq.appendChild(span);
+          } else {
+            const img = document.createElement('img');
+            img.className = 'chess-piece';
+            img.src = CONSTANTS.PIECE_IMAGES[piece.color][piece.type];
+            img.draggable = false;
+            sq.appendChild(img);
+          }
+        }
+        board.appendChild(sq);
+      }
+    }
+    board.style.gridTemplateColumns = 'repeat(4, 1fr)';
+    board.style.gridTemplateRows    = 'repeat(4, 1fr)';
+  }
+
+  /* ── 모달 UI ── */
+  static open() {
+    this.pending = { ...this.current };
+    this._updateModalUI();
+    this.renderPreview();
+    if (elements.themeModal) elements.themeModal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  }
+
+  static close() {
+    if (elements.themeModal) elements.themeModal.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  static _updateModalUI() {
+    // 보드 테마 스와치 활성화
+    if (elements.boardThemeSwatches) {
+      elements.boardThemeSwatches.querySelectorAll('.theme-swatch').forEach(sw => {
+        sw.classList.toggle('active', sw.dataset.boardTheme === this.pending.boardTheme);
+      });
+      const theme = this.BOARD_THEMES[this.pending.boardTheme];
+      if (elements.boardThemeName && theme) {
+        elements.boardThemeName.textContent = theme.name;
+      }
+    }
+    // 기물 테마
+    if (elements.pieceThemeSwatches) {
+      elements.pieceThemeSwatches.querySelectorAll('[data-piece-theme]').forEach(sw => {
+        sw.style.borderColor = sw.dataset.pieceTheme === this.pending.pieceTheme
+          ? 'var(--primary-color)' : 'transparent';
+      });
+    }
+    // 좌표 토글
+    this._updateToggleUI(this.pending.showCoordinates);
+  }
+
+  static _updateToggleUI(on) {
+    if (elements.coordsToggleTrack) {
+      elements.coordsToggleTrack.style.background = on ? 'var(--primary-color)' : 'var(--border-color)';
+    }
+    if (elements.coordsToggleThumb) {
+      elements.coordsToggleThumb.style.left = on ? '24px' : '2px';
+    }
+    if (elements.showCoordsToggle) {
+      elements.showCoordsToggle.checked = on;
+    }
+  }
+
+  static initEvents() {
+    if (elements.openThemeBtn) {
+      elements.openThemeBtn.addEventListener('click', () => ThemeManager.open());
+    }
+    if (elements.closeThemeBtn) {
+      elements.closeThemeBtn.addEventListener('click', () => ThemeManager.close());
+    }
+    if (elements.cancelThemeBtn) {
+      elements.cancelThemeBtn.addEventListener('click', () => ThemeManager.close());
+    }
+    if (elements.themeModal) {
+      elements.themeModal.addEventListener('click', e => {
+        if (e.target === elements.themeModal) ThemeManager.close();
+      });
+    }
+
+    // 보드 테마 스와치 클릭
+    if (elements.boardThemeSwatches) {
+      elements.boardThemeSwatches.addEventListener('click', e => {
+        const sw = e.target.closest('.theme-swatch');
+        if (!sw) return;
+        ThemeManager.pending.boardTheme = sw.dataset.boardTheme;
+        ThemeManager._updateModalUI();
+        ThemeManager.renderPreview();
+      });
+    }
+
+    // 기물 테마 클릭
+    if (elements.pieceThemeSwatches) {
+      elements.pieceThemeSwatches.addEventListener('click', e => {
+        const sw = e.target.closest('[data-piece-theme]');
+        if (!sw) return;
+        ThemeManager.pending.pieceTheme = sw.dataset.pieceTheme;
+        ThemeManager._updateModalUI();
+        ThemeManager.renderPreview();
+      });
+    }
+
+    // 좌표 토글
+    if (elements.showCoordsToggle) {
+      elements.showCoordsToggle.addEventListener('change', e => {
+        ThemeManager.pending.showCoordinates = e.target.checked;
+        ThemeManager._updateToggleUI(e.target.checked);
+        ThemeManager.renderPreview();
+      });
+    }
+    // 토글 트랙/썸 클릭도 처리
+    const toggleArea = elements.coordsToggleTrack && elements.coordsToggleTrack.parentElement;
+    if (toggleArea) {
+      toggleArea.addEventListener('click', () => {
+        const newVal = !ThemeManager.pending.showCoordinates;
+        ThemeManager.pending.showCoordinates = newVal;
+        ThemeManager._updateToggleUI(newVal);
+        ThemeManager.renderPreview();
+      });
+    }
+
+    // 저장
+    if (elements.saveThemeBtn) {
+      elements.saveThemeBtn.addEventListener('click', async () => {
+        await ThemeManager.save();
+        // 현재 게임판 다시 렌더링
+        if (gameState.gameBoard) BoardRenderer.render(gameState.gameBoard);
+        if (elements.themeSaveMsg) {
+          elements.themeSaveMsg.textContent = '✓ 저장되었습니다.';
+          elements.themeSaveMsg.style.display = 'block';
+          setTimeout(() => {
+            elements.themeSaveMsg.style.display = 'none';
+            ThemeManager.close();
+          }, 1000);
+        } else {
+          ThemeManager.close();
+        }
+      });
+    }
+  }
+}
+
+// 기보 재생 관리 클래스
+class ReplayManager {
+  static moveHistory = [];
+  static boardHistory = [];
+  static currentIndex = 0;
+  static autoPlayTimer = null;
+  static isPlaying = false;
+
+  static setData(moveHistory, boardHistory) {
+    this.moveHistory = moveHistory;
+    this.boardHistory = boardHistory;
+    this.currentIndex = 0;
+    this.isPlaying = false;
+  }
+
+  static open() {
+    if (!this.boardHistory.length) return;
+    this.currentIndex = 0;
+    this.isPlaying = false;
+    this.renderMoveList();
+    this.renderBoard();
+    if (elements.replayModal) elements.replayModal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  }
+
+  static close() {
+    this.stopAutoPlay();
+    if (elements.replayModal) elements.replayModal.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  static goToIndex(index) {
+    if (index < 0) index = 0;
+    if (index >= this.boardHistory.length) index = this.boardHistory.length - 1;
+    this.currentIndex = index;
+    this.renderBoard();
+    this.updateMoveListHighlight();
+  }
+
+  static first() { this.goToIndex(0); }
+  static last()  { this.goToIndex(this.boardHistory.length - 1); }
+  static prev()  { this.goToIndex(this.currentIndex - 1); }
+  static next()  { this.goToIndex(this.currentIndex + 1); }
+
+  static toggleAutoPlay() {
+    if (this.isPlaying) {
+      this.stopAutoPlay();
+    } else {
+      this.startAutoPlay();
+    }
+  }
+
+  static startAutoPlay() {
+    if (this.currentIndex >= this.boardHistory.length - 1) {
+      this.currentIndex = 0;
+      this.renderBoard();
+      this.updateMoveListHighlight();
+    }
+    this.isPlaying = true;
+    if (elements.replayAutoPlayBtn) {
+      elements.replayAutoPlayBtn.innerHTML = '<i class="fas fa-pause"></i> 일시정지';
+    }
+    const speed = elements.replaySpeedSelect ? parseInt(elements.replaySpeedSelect.value) : 1000;
+    this.scheduleNext(speed);
+  }
+
+  static scheduleNext(speed) {
+    this.autoPlayTimer = setTimeout(() => {
+      if (!this.isPlaying) return;
+      if (this.currentIndex < this.boardHistory.length - 1) {
+        this.next();
+        const currentSpeed = elements.replaySpeedSelect ? parseInt(elements.replaySpeedSelect.value) : 1000;
+        this.scheduleNext(currentSpeed);
+      } else {
+        this.stopAutoPlay();
+      }
+    }, speed);
+  }
+
+  static stopAutoPlay() {
+    this.isPlaying = false;
+    clearTimeout(this.autoPlayTimer);
+    this.autoPlayTimer = null;
+    if (elements.replayAutoPlayBtn) {
+      elements.replayAutoPlayBtn.innerHTML = '<i class="fas fa-play"></i> 자동재생';
+    }
+  }
+
+  static renderBoard() {
+    const board = this.boardHistory[this.currentIndex];
+    if (!board || !elements.replayBoard) return;
+
+    elements.replayBoard.innerHTML = '';
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        const square = document.createElement('div');
+        square.className = 'square ' + ((row + col) % 2 === 0 ? 'white' : 'black');
+        square.dataset.row = row;
+        square.dataset.col = col;
+
+        // 이동 출발/도착 강조
+        if (this.currentIndex > 0) {
+          const move = this.moveHistory[this.currentIndex - 1];
+          if (move) {
+            if ((move.from[0] === row && move.from[1] === col) ||
+                (move.to[0] === row && move.to[1] === col)) {
+              square.style.background = 'rgba(255, 200, 0, 0.4)';
+            }
+          }
+        }
+
+        const piece = board[row][col];
+        if (piece) {
+          const img = document.createElement('img');
+          img.className = 'chess-piece';
+          img.src = CONSTANTS.PIECE_IMAGES[piece.color][piece.type];
+          img.alt = `${piece.color} ${piece.type}`;
+          img.draggable = false;
+          square.appendChild(img);
+        }
+        elements.replayBoard.appendChild(square);
+      }
+    }
+
+    // 위치 레이블 업데이트
+    if (elements.replayPositionLabel) {
+      if (this.currentIndex === 0) {
+        elements.replayPositionLabel.textContent = '시작 국면';
+      } else {
+        const move = this.moveHistory[this.currentIndex - 1];
+        const colorText = move.color === 'white' ? '백' : '흑';
+        elements.replayPositionLabel.textContent = `${Math.ceil(this.currentIndex / 2)}수 - ${colorText} 이동`;
+      }
+    }
+  }
+
+  static renderMoveList() {
+    if (!elements.replayMoveList) return;
+    elements.replayMoveList.innerHTML = '';
+
+    // 헤더 행
+    const header = document.createElement('div');
+    header.style.cssText = 'font-weight:600;color:var(--text-secondary);padding:2px 6px;';
+    header.textContent = '#';
+    elements.replayMoveList.appendChild(header);
+
+    const whiteHeader = document.createElement('div');
+    whiteHeader.style.cssText = 'font-weight:600;color:var(--text-secondary);padding:2px 6px;';
+    whiteHeader.textContent = '백';
+    elements.replayMoveList.appendChild(whiteHeader);
+
+    const blackHeader = document.createElement('div');
+    blackHeader.style.cssText = 'font-weight:600;color:var(--text-secondary);padding:2px 6px;';
+    blackHeader.textContent = '흑';
+    elements.replayMoveList.appendChild(blackHeader);
+
+    const cols = ['a','b','c','d','e','f','g','h'];
+    for (let i = 0; i < this.moveHistory.length; i += 2) {
+      const moveNum = Math.floor(i / 2) + 1;
+
+      const numEl = document.createElement('div');
+      numEl.style.cssText = 'padding:3px 6px;color:var(--text-secondary);font-size:0.8rem;display:flex;align-items:center;';
+      numEl.textContent = moveNum + '.';
+      elements.replayMoveList.appendChild(numEl);
+
+      // 백 이동
+      const whiteMove = this.moveHistory[i];
+      const whiteMoveEl = document.createElement('div');
+      whiteMoveEl.style.cssText = 'padding:3px 6px;border-radius:4px;cursor:pointer;';
+      whiteMoveEl.dataset.moveIndex = i + 1;
+      whiteMoveEl.textContent = this.formatMove(whiteMove, cols);
+      whiteMoveEl.addEventListener('click', () => this.goToIndex(i + 1));
+      elements.replayMoveList.appendChild(whiteMoveEl);
+
+      // 흑 이동 (없을 수도)
+      const blackMoveEl = document.createElement('div');
+      blackMoveEl.style.cssText = 'padding:3px 6px;border-radius:4px;cursor:pointer;';
+      if (this.moveHistory[i + 1]) {
+        const blackMove = this.moveHistory[i + 1];
+        blackMoveEl.dataset.moveIndex = i + 2;
+        blackMoveEl.textContent = this.formatMove(blackMove, cols);
+        blackMoveEl.addEventListener('click', () => this.goToIndex(i + 2));
+      }
+      elements.replayMoveList.appendChild(blackMoveEl);
+    }
+
+    this.updateMoveListHighlight();
+  }
+
+  static formatMove(move, cols) {
+    if (!move) return '';
+    if (move.special === 'castling') {
+      return move.to[1] > move.from[1] ? 'O-O' : 'O-O-O';
+    }
+    const pieceSymbols = { pawn: '', rook: 'R', knight: 'N', bishop: 'B', queen: 'Q', king: 'K' };
+    const prefix = pieceSymbols[move.piece] || '';
+    const capture = move.capture ? 'x' : '';
+    const dest = cols[move.to[1]] + (8 - move.to[0]);
+    const fromFile = move.piece === 'pawn' && move.capture ? cols[move.from[1]] : '';
+    return `${prefix}${fromFile}${capture}${dest}`;
+  }
+
+  static updateMoveListHighlight() {
+    if (!elements.replayMoveList) return;
+    elements.replayMoveList.querySelectorAll('[data-move-index]').forEach(el => {
+      const idx = parseInt(el.dataset.moveIndex);
+      if (idx === this.currentIndex) {
+        el.style.background = 'var(--primary-color)';
+        el.style.color = 'white';
+        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else {
+        el.style.background = '';
+        el.style.color = '';
+      }
+    });
+  }
+
+  static initEvents() {
+    if (elements.replayBtn) {
+      elements.replayBtn.addEventListener('click', () => ReplayManager.open());
+    }
+    if (elements.closeReplayBtn) {
+      elements.closeReplayBtn.addEventListener('click', () => ReplayManager.close());
+    }
+    if (elements.replayFirstBtn) {
+      elements.replayFirstBtn.addEventListener('click', () => ReplayManager.first());
+    }
+    if (elements.replayPrevBtn) {
+      elements.replayPrevBtn.addEventListener('click', () => ReplayManager.prev());
+    }
+    if (elements.replayNextBtn) {
+      elements.replayNextBtn.addEventListener('click', () => ReplayManager.next());
+    }
+    if (elements.replayLastBtn) {
+      elements.replayLastBtn.addEventListener('click', () => ReplayManager.last());
+    }
+    if (elements.replayAutoPlayBtn) {
+      elements.replayAutoPlayBtn.addEventListener('click', () => ReplayManager.toggleAutoPlay());
+    }
+    // 모달 바깥 클릭으로 닫기
+    if (elements.replayModal) {
+      elements.replayModal.addEventListener('click', (e) => {
+        if (e.target === elements.replayModal) ReplayManager.close();
+      });
+    }
+    // 키보드 단축키
+    document.addEventListener('keydown', (e) => {
+      if (!elements.replayModal || elements.replayModal.style.display === 'none') return;
+      if (e.key === 'ArrowLeft') ReplayManager.prev();
+      else if (e.key === 'ArrowRight') ReplayManager.next();
+      else if (e.key === 'Home') ReplayManager.first();
+      else if (e.key === 'End') ReplayManager.last();
+      else if (e.key === 'Escape') ReplayManager.close();
+      else if (e.key === ' ') { e.preventDefault(); ReplayManager.toggleAutoPlay(); }
+    });
+  }
+}
+
 // 전역 인스턴스
 const audioManager = new AudioManager();
 
@@ -1379,7 +1946,10 @@ function init() {
   const audioManager = new AudioManager();
 
   EventManager.init();
+  ThemeManager.initEvents();
+  ReplayManager.initEvents();
   setupNavigation();
+  ThemeManager.load(); // 설정 로드 (비동기, 완료 시 자동 적용)
 
   // 초기 UI 업데이트
   UIManager.updateGameInfo();
