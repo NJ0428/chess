@@ -6130,3 +6130,69 @@ body.keyboard-nav *:focus {
   from { opacity: 1; }
   to   { opacity: 0.6; }
 }
+
+/*=====================================================
+    게임 분석 UI
+=====================================================*/
+
+/* 분석 배지 (수 목록 안 품질 표시) */
+.analysis-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.analysis-badge.blunder    { color: #e74c3c; background: rgba(231,76,60,0.15); }
+.analysis-badge.mistake    { color: #e67e22; background: rgba(230,126,34,0.15); }
+.analysis-badge.inaccuracy { color: #f39c12; background: rgba(243,156,18,0.12); }
+
+/* 평가 바 컨테이너 */
+#evalBarContainer {
+  user-select: none;
+}
+
+#evalBarOuter {
+  border: 1px solid var(--border-color);
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
+}
+
+#evalBarWhite {
+  box-shadow: 0 -2px 6px rgba(255,255,255,0.15);
+}
+
+/* 승률 그래프 */
+#evalGraph {
+  image-rendering: crisp-edges;
+  width: 100%;
+  max-width: 360px;
+}
+
+/* 수 분석 패널 */
+#moveAnalysisPanel {
+  border-left: 3px solid var(--primary-color);
+  transition: border-color 0.3s;
+}
+
+/* 분석 중 스피너 */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.fa-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* 분석 요약 배지 */
+#analysisSummary .analysis-badge {
+  display: inline-block;
+  margin-right: 2px;
+}
+
+/* 반응형: 소형 화면에서 평가 바 숨김 */
+@media (max-width: 600px) {
+  #evalBarContainer {
+    display: none !important;
+  }
+  #evalGraph {
+    max-width: 100%;
+  }
+}
