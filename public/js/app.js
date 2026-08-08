@@ -156,6 +156,26 @@ const elements = {
   replaySpeedSelect: document.getElementById('replaySpeedSelect'),
   replayMoveList: document.getElementById('replayMoveList'),
 
+  // 분석
+  analyzeBtn: document.getElementById('analyzeBtn'),
+  analysisProgressBar: document.getElementById('analysisProgressBar'),
+  analysisProgressFill: document.getElementById('analysisProgressFill'),
+  analysisProgressText: document.getElementById('analysisProgressText'),
+  evalBarOuter: document.getElementById('evalBarOuter'),
+  evalBarWhite: document.getElementById('evalBarWhite'),
+  evalBarBlack: document.getElementById('evalBarBlack'),
+  evalLabelTop: document.getElementById('evalLabelTop'),
+  evalLabelBottom: document.getElementById('evalLabelBottom'),
+  evalScoreDisplay: document.getElementById('evalScoreDisplay'),
+  evalGraphContainer: document.getElementById('evalGraphContainer'),
+  evalGraph: document.getElementById('evalGraph'),
+  analysisSummary: document.getElementById('analysisSummary'),
+  moveAnalysisPanel: document.getElementById('moveAnalysisPanel'),
+  moveQualityBadge: document.getElementById('moveQualityBadge'),
+  moveCpLoss: document.getElementById('moveCpLoss'),
+  bestMoveInfo: document.getElementById('bestMoveInfo'),
+  bestMoveText: document.getElementById('bestMoveText'),
+
   // 타이머
   timeModeSelect: document.getElementById('timeModeSelect'),
   incrementGroup: document.getElementById('incrementGroup'),
@@ -1213,8 +1233,21 @@ class EventManager {
 
       if (data.moveHistory && data.boardHistory && data.moveHistory.length > 0) {
         ReplayManager.setData(data.moveHistory, data.boardHistory);
+        AnalysisManager.reset();
         if (elements.replayBtn) elements.replayBtn.style.display = 'block';
       }
+    });
+
+    socket.on('analysisProgress', (data) => {
+      AnalysisManager.onProgress(data);
+    });
+
+    socket.on('analysisComplete', (data) => {
+      AnalysisManager.onComplete(data);
+    });
+
+    socket.on('analysisError', (msg) => {
+      AnalysisManager.onError(msg);
     });
 
     socket.on('gameRestarted', (data) => {
@@ -1655,6 +1688,294 @@ class ThemeManager {
 }
 
 // 기보 재생 관리 클래스
+// ─── 게임 분석 매니저 ──────────────────────────────────────────
+class AnalysisManager {
+  static positionEvals = [];   // evalCp (백 기준) per board position
+  static moveAnalysis  = [];   // {quality, cpLoss, bestMoveUCI} per move
+  static isAnalyzing   = false;
+
+  // 품질 → 표시 정보 매핑
+  static QUALITY_INFO = {
+    best:       { label: '★ 최선',      color: '#27ae60', bg: 'rgba(39,174,96,0.15)',  badge: '★' },
+    excellent:  { label: '! 훌륭한',    color: '#2ecc71', bg: 'rgba(46,204,113,0.12)', badge: '!' },
+    good:       { label: '⊕ 좋은',      color: '#3498db', bg: 'rgba(52,152,219,0.12)', badge: '⊕' },
+    inaccuracy: { label: '?! 부정확',   color: '#f39c12', bg: 'rgba(243,156,18,0.15)', badge: '?!' },
+    mistake:    { label: '? 실수',      color: '#e67e22', bg: 'rgba(230,126,34,0.15)', badge: '?' },
+    blunder:    { label: '?? 블런더',   color: '#e74c3c', bg: 'rgba(231,76,60,0.18)',  badge: '??' }
+  };
+
+  static reset() {
+    this.positionEvals = [];
+    this.moveAnalysis  = [];
+    this.isAnalyzing   = false;
+    this.hideProgress();
+    if (elements.evalGraphContainer) elements.evalGraphContainer.style.display = 'none';
+    if (elements.evalScoreDisplay)   elements.evalScoreDisplay.textContent = '';
+    if (elements.moveAnalysisPanel)  elements.moveAnalysisPanel.style.display = 'none';
+    if (elements.analysisSummary)    elements.analysisSummary.innerHTML = '';
+    this.updateEvalBar(0);
+  }
+
+  static request() {
+    if (this.isAnalyzing) return;
+    if (!ReplayManager.moveHistory.length) {
+      UIManager.showNotification('분석할 게임 데이터가 없습니다.');
+      return;
+    }
+    this.isAnalyzing = true;
+    this.showProgress(0);
+    socket.emit('requestAnalysis', {
+      moveHistory:  ReplayManager.moveHistory,
+      boardHistory: ReplayManager.boardHistory
+    });
+  }
+
+  static onProgress({ percent }) {
+    if (elements.analysisProgressFill) elements.analysisProgressFill.style.width = percent + '%';
+    if (elements.analysisProgressText) elements.analysisProgressText.textContent = percent + '%';
+  }
+
+  static onComplete({ positionEvals, moveAnalysis }) {
+    this.isAnalyzing   = false;
+    this.positionEvals = positionEvals || [];
+    this.moveAnalysis  = moveAnalysis  || [];
+    this.hideProgress();
+    if (elements.evalGraphContainer) elements.evalGraphContainer.style.display = 'block';
+    // 현재 국면 eval 바 업데이트
+    const idx = ReplayManager.currentIndex;
+    if (this.positionEvals[idx] !== undefined) this.updateEvalBar(this.positionEvals[idx]);
+    // 수 목록 새로 그리기 (배지 포함)
+    ReplayManager.renderMoveList();
+    // 그래프 그리기
+    this.renderGraph();
+    // 분석 요약
+    this.renderSummary();
+    // 현재 수 분석 패널 업데이트
+    this.updateMovePanel(idx);
+    UIManager.showNotification('게임 분석 완료!');
+  }
+
+  static onError(msg) {
+    this.isAnalyzing = false;
+    this.hideProgress();
+    UIManager.showNotification('분석 오류: ' + msg);
+  }
+
+  static showProgress(percent) {
+    if (elements.analysisProgressBar) elements.analysisProgressBar.style.display = 'block';
+    if (elements.analysisProgressFill) elements.analysisProgressFill.style.width = percent + '%';
+    if (elements.analysisProgressText) elements.analysisProgressText.textContent = percent + '%';
+  }
+
+  static hideProgress() {
+    if (elements.analysisProgressBar) elements.analysisProgressBar.style.display = 'none';
+  }
+
+  // evalCp: 백 기준 센티폰 (양수=백 유리, 음수=흑 유리)
+  static updateEvalBar(evalCp) {
+    if (!elements.evalBarWhite) return;
+    const capped = Math.max(-600, Math.min(600, evalCp));
+    const whiteH  = 50 + (capped / 600) * 50;   // 0~100 %
+    const blackH  = 100 - whiteH;
+    elements.evalBarWhite.style.height = whiteH + '%';
+    elements.evalBarBlack.style.height = blackH + '%';
+
+    // 평가 레이블 (점수 표기)
+    const abs = Math.abs(evalCp);
+    let label;
+    if (abs >= 9000)      label = evalCp > 0 ? 'M' : '-M';
+    else                  label = (evalCp >= 0 ? '+' : '') + (evalCp / 100).toFixed(1);
+
+    if (elements.evalLabelTop)    elements.evalLabelTop.textContent    = evalCp <= 0 ? label.replace('+','').replace('M','M') : '';
+    if (elements.evalLabelBottom) elements.evalLabelBottom.textContent  = evalCp >= 0 ? label : '';
+    if (elements.evalScoreDisplay) {
+      elements.evalScoreDisplay.textContent = label;
+      elements.evalScoreDisplay.style.color = evalCp >= 0 ? '#e0e0e0' : '#9b59b6';
+    }
+  }
+
+  // 현재 수에 대한 분석 패널 업데이트
+  static updateMovePanel(boardIndex) {
+    if (!elements.moveAnalysisPanel || !this.moveAnalysis.length) {
+      if (elements.moveAnalysisPanel) elements.moveAnalysisPanel.style.display = 'none';
+      return;
+    }
+    const moveIdx = boardIndex - 1; // moveAnalysis[0] = 첫번째 수
+    if (moveIdx < 0 || moveIdx >= this.moveAnalysis.length) {
+      elements.moveAnalysisPanel.style.display = 'none';
+      return;
+    }
+    const ma = this.moveAnalysis[moveIdx];
+    const qi = this.QUALITY_INFO[ma.quality] || this.QUALITY_INFO.good;
+    elements.moveAnalysisPanel.style.display = 'block';
+    if (elements.moveQualityBadge) {
+      elements.moveQualityBadge.textContent = qi.label;
+      elements.moveQualityBadge.style.cssText = `color:${qi.color};background:${qi.bg};padding:2px 8px;border-radius:4px;font-size:0.85rem;font-weight:700;`;
+    }
+    if (elements.moveCpLoss) {
+      elements.moveCpLoss.textContent = ma.cpLoss > 0 ? `-${ma.cpLoss}cp` : '최선의 수';
+    }
+    // 최선 수 표시
+    if (ma.bestMoveUCI && ma.quality !== 'best' && elements.bestMoveInfo) {
+      elements.bestMoveInfo.style.display = 'block';
+      if (elements.bestMoveText) elements.bestMoveText.textContent = this.uciToSAN(ma.bestMoveUCI, boardIndex - 1);
+    } else if (elements.bestMoveInfo) {
+      elements.bestMoveInfo.style.display = 'none';
+    }
+  }
+
+  // UCI → 간단한 대수기보 변환 (예: e2e4 → e4)
+  static uciToSAN(uci) {
+    if (!uci || uci.length < 4) return uci || '';
+    const cols = ['a','b','c','d','e','f','g','h'];
+    const toCol  = uci.charCodeAt(2) - 97;
+    const toRow  = 8 - parseInt(uci[3]);
+    if (toCol < 0 || toCol > 7 || toRow < 0 || toRow > 7) return uci;
+    return cols[toCol] + (8 - toRow);
+  }
+
+  // 승률 그래프 렌더링
+  static renderGraph() {
+    const canvas = elements.evalGraph;
+    if (!canvas || !this.positionEvals.length) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    const evals = this.positionEvals;
+    ctx.clearRect(0, 0, w, h);
+
+    // 배경
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, w, h);
+
+    // 중앙선 (50%)
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.setLineDash([3, 3]);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    if (evals.length < 2) return;
+
+    // 포인트 계산
+    const pts = evals.map((e, i) => {
+      const x = (i / (evals.length - 1)) * w;
+      const capped = Math.max(-600, Math.min(600, e));
+      const y = h / 2 - (capped / 600) * (h / 2 - 4);
+      return { x, y };
+    });
+
+    // 백 영역 (상단, 양수)
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, w, h / 2);
+    ctx.clip();
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, h / 2);
+    pts.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.lineTo(pts[pts.length - 1].x, h / 2);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(220,220,220,0.75)';
+    ctx.fill();
+    ctx.restore();
+
+    // 흑 영역 (하단, 음수)
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, h / 2, w, h / 2);
+    ctx.clip();
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, h / 2);
+    pts.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.lineTo(pts[pts.length - 1].x, h / 2);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(30,30,55,0.9)';
+    ctx.fill();
+    ctx.restore();
+
+    // 평가선
+    ctx.beginPath();
+    ctx.strokeStyle = '#6d5dd8';
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.stroke();
+
+    // 블런더/실수 마크
+    this.moveAnalysis.forEach((ma, i) => {
+      if (ma.quality === 'blunder' || ma.quality === 'mistake') {
+        const p = pts[i + 1];
+        if (!p) return;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = ma.quality === 'blunder' ? '#e74c3c' : '#e67e22';
+        ctx.fill();
+      }
+    });
+
+    // 현재 위치 마커
+    const curIdx = ReplayManager.currentIndex;
+    if (curIdx < pts.length) {
+      const cp = pts[curIdx];
+      ctx.beginPath();
+      ctx.arc(cp.x, cp.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ff7a59';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  // 분석 요약 (블런더/실수/부정확 수 세기)
+  static renderSummary() {
+    if (!elements.analysisSummary || !this.moveAnalysis.length) return;
+    const white = { blunder: 0, mistake: 0, inaccuracy: 0 };
+    const black = { blunder: 0, mistake: 0, inaccuracy: 0 };
+    this.moveAnalysis.forEach((ma, idx) => {
+      const move = ReplayManager.moveHistory[idx];
+      if (!move) return;
+      const side = move.color;
+      if (ma.quality === 'blunder')         (side === 'white' ? white : black).blunder++;
+      else if (ma.quality === 'mistake')    (side === 'white' ? white : black).mistake++;
+      else if (ma.quality === 'inaccuracy') (side === 'white' ? white : black).inaccuracy++;
+    });
+    elements.analysisSummary.innerHTML = `
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <span style="color:#aaa;font-size:0.72rem;font-weight:600;">백:</span>
+        <span class="analysis-badge blunder">${white.blunder}??</span>
+        <span class="analysis-badge mistake">${white.mistake}?</span>
+        <span class="analysis-badge inaccuracy">${white.inaccuracy}?!</span>
+        <span style="color:#555;margin:0 4px;">│</span>
+        <span style="color:#aaa;font-size:0.72rem;font-weight:600;">흑:</span>
+        <span class="analysis-badge blunder">${black.blunder}??</span>
+        <span class="analysis-badge mistake">${black.mistake}?</span>
+        <span class="analysis-badge inaccuracy">${black.inaccuracy}?!</span>
+      </div>`;
+  }
+
+  static initEvents() {
+    if (elements.analyzeBtn) {
+      elements.analyzeBtn.addEventListener('click', () => AnalysisManager.request());
+    }
+    if (elements.evalGraph) {
+      elements.evalGraph.addEventListener('click', (e) => {
+        const rect = elements.evalGraph.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const total = AnalysisManager.positionEvals.length;
+        if (!total) return;
+        const idx = Math.round((x / elements.evalGraph.width) * (total - 1));
+        ReplayManager.goToIndex(Math.max(0, Math.min(total - 1, idx)));
+      });
+    }
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+
 class ReplayManager {
   static moveHistory = [];
   static boardHistory = [];
@@ -1691,6 +2012,13 @@ class ReplayManager {
     this.currentIndex = index;
     this.renderBoard();
     this.updateMoveListHighlight();
+    // 분석 데이터 연동
+    if (AnalysisManager.positionEvals.length) {
+      const ev = AnalysisManager.positionEvals[index];
+      if (ev !== undefined) AnalysisManager.updateEvalBar(ev);
+      AnalysisManager.updateMovePanel(index);
+      AnalysisManager.renderGraph();
+    }
   }
 
   static first() { this.goToIndex(0); }
@@ -1765,6 +2093,19 @@ class ReplayManager {
           }
         }
 
+        // 분석: 최선 수 하이라이트 (블런더/실수인 경우 최선 수 목적지 표시)
+        if (AnalysisManager.moveAnalysis.length && this.currentIndex > 0) {
+          const ma = AnalysisManager.moveAnalysis[this.currentIndex - 1];
+          if (ma && ma.bestMoveUCI && (ma.quality === 'blunder' || ma.quality === 'mistake' || ma.quality === 'inaccuracy')) {
+            const uci = ma.bestMoveUCI;
+            const toC = uci.charCodeAt(2) - 97;
+            const toR = 8 - parseInt(uci[3]);
+            if (toR === row && toC === col) {
+              square.style.boxShadow = 'inset 0 0 0 3px rgba(39,174,96,0.85)';
+            }
+          }
+        }
+
         const piece = board[row][col];
         if (piece) {
           const img = document.createElement('img');
@@ -1793,51 +2134,74 @@ class ReplayManager {
   static renderMoveList() {
     if (!elements.replayMoveList) return;
     elements.replayMoveList.innerHTML = '';
+    const hasAnalysis = AnalysisManager.moveAnalysis.length > 0;
 
     // 헤더 행
     const header = document.createElement('div');
-    header.style.cssText = 'font-weight:600;color:var(--text-secondary);padding:2px 6px;';
+    header.style.cssText = 'font-weight:600;color:var(--text-secondary);padding:2px 6px;font-size:0.75rem;';
     header.textContent = '#';
     elements.replayMoveList.appendChild(header);
 
     const whiteHeader = document.createElement('div');
-    whiteHeader.style.cssText = 'font-weight:600;color:var(--text-secondary);padding:2px 6px;';
+    whiteHeader.style.cssText = 'font-weight:600;color:var(--text-secondary);padding:2px 6px;font-size:0.75rem;';
     whiteHeader.textContent = '백';
     elements.replayMoveList.appendChild(whiteHeader);
 
     const blackHeader = document.createElement('div');
-    blackHeader.style.cssText = 'font-weight:600;color:var(--text-secondary);padding:2px 6px;';
+    blackHeader.style.cssText = 'font-weight:600;color:var(--text-secondary);padding:2px 6px;font-size:0.75rem;';
     blackHeader.textContent = '흑';
     elements.replayMoveList.appendChild(blackHeader);
 
     const cols = ['a','b','c','d','e','f','g','h'];
+
+    const makeMoveEl = (moveIdx) => {
+      const move = this.moveHistory[moveIdx];
+      if (!move) return document.createElement('div');
+      const el = document.createElement('div');
+      el.style.cssText = 'padding:3px 5px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:4px;';
+      el.dataset.moveIndex = moveIdx + 1;
+
+      const notation = document.createElement('span');
+      notation.textContent = this.formatMove(move, cols);
+      el.appendChild(notation);
+
+      // 분석 배지
+      if (hasAnalysis && AnalysisManager.moveAnalysis[moveIdx]) {
+        const ma = AnalysisManager.moveAnalysis[moveIdx];
+        const qi = AnalysisManager.QUALITY_INFO[ma.quality];
+        if (qi && ma.quality !== 'best' && ma.quality !== 'good' && ma.quality !== 'excellent') {
+          const badge = document.createElement('span');
+          badge.textContent = qi.badge;
+          badge.style.cssText = `color:${qi.color};font-size:0.75rem;font-weight:700;`;
+          badge.title = qi.label + (ma.cpLoss > 0 ? ` (-${ma.cpLoss}cp)` : '');
+          el.appendChild(badge);
+        } else if (qi && ma.quality === 'best') {
+          const badge = document.createElement('span');
+          badge.textContent = '★';
+          badge.style.cssText = `color:${qi.color};font-size:0.7rem;`;
+          el.appendChild(badge);
+        }
+      }
+
+      el.addEventListener('click', () => this.goToIndex(moveIdx + 1));
+      return el;
+    };
+
     for (let i = 0; i < this.moveHistory.length; i += 2) {
       const moveNum = Math.floor(i / 2) + 1;
 
       const numEl = document.createElement('div');
-      numEl.style.cssText = 'padding:3px 6px;color:var(--text-secondary);font-size:0.8rem;display:flex;align-items:center;';
+      numEl.style.cssText = 'padding:3px 6px;color:var(--text-secondary);font-size:0.78rem;display:flex;align-items:center;';
       numEl.textContent = moveNum + '.';
       elements.replayMoveList.appendChild(numEl);
 
-      // 백 이동
-      const whiteMove = this.moveHistory[i];
-      const whiteMoveEl = document.createElement('div');
-      whiteMoveEl.style.cssText = 'padding:3px 6px;border-radius:4px;cursor:pointer;';
-      whiteMoveEl.dataset.moveIndex = i + 1;
-      whiteMoveEl.textContent = this.formatMove(whiteMove, cols);
-      whiteMoveEl.addEventListener('click', () => this.goToIndex(i + 1));
-      elements.replayMoveList.appendChild(whiteMoveEl);
+      elements.replayMoveList.appendChild(makeMoveEl(i));
 
-      // 흑 이동 (없을 수도)
-      const blackMoveEl = document.createElement('div');
-      blackMoveEl.style.cssText = 'padding:3px 6px;border-radius:4px;cursor:pointer;';
       if (this.moveHistory[i + 1]) {
-        const blackMove = this.moveHistory[i + 1];
-        blackMoveEl.dataset.moveIndex = i + 2;
-        blackMoveEl.textContent = this.formatMove(blackMove, cols);
-        blackMoveEl.addEventListener('click', () => this.goToIndex(i + 2));
+        elements.replayMoveList.appendChild(makeMoveEl(i + 1));
+      } else {
+        elements.replayMoveList.appendChild(document.createElement('div'));
       }
-      elements.replayMoveList.appendChild(blackMoveEl);
     }
 
     this.updateMoveListHighlight();
@@ -1948,6 +2312,7 @@ function init() {
   EventManager.init();
   ThemeManager.initEvents();
   ReplayManager.initEvents();
+  AnalysisManager.initEvents();
   setupNavigation();
   ThemeManager.load(); // 설정 로드 (비동기, 완료 시 자동 적용)
 

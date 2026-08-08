@@ -322,6 +322,7 @@ class ChessGame {
       socket.on('leaveSpectate', (roomId) => this.handleLeaveSpectate(socket, roomId));
       socket.on('sendChatMessage', (data) => this.handleChatMessage(socket, data));
       socket.on('sendSpectatorMessage', (data) => this.handleSpectatorMessage(socket, data));
+      socket.on('requestAnalysis', (data) => this.handleAnalysis(socket, data));
       socket.on('disconnect', () => this.handleDisconnect(socket));
     });
   }
@@ -684,6 +685,15 @@ class ChessGame {
     const spectatorCount = this.spectators[roomId] ? Object.keys(this.spectators[roomId]).length : 0;
     io.to(roomId).emit('spectatorLeft', { spectatorCount });
     io.emit('spectateListUpdated');
+  }
+
+  async handleAnalysis(socket, data) {
+    const { moveHistory, boardHistory } = data || {};
+    if (!moveHistory || !boardHistory || boardHistory.length < 2) {
+      socket.emit('analysisError', '분석할 게임 데이터가 없습니다.');
+      return;
+    }
+    await stockfishAI.analyzeGameData(socket, moveHistory, boardHistory);
   }
 
   handleDisconnect(socket) {
@@ -1403,6 +1413,7 @@ class StockfishAI {
   constructor() {
     this.engine = null;
     this.ready = false;
+    this.isAnalyzing = false;
     this.init();
   }
 
@@ -1531,6 +1542,174 @@ class StockfishAI {
       this.engine.sendCommand(`position fen ${fen}`);
       this.engine.sendCommand(`go depth ${depth}`);
     });
+  }
+
+  // 단일 포지션 평가 (분석용)
+  analyzePosition(fen) {
+    return new Promise((resolve) => {
+      if (!this.ready || !this.engine) {
+        resolve({ evalCp: 0, bestMoveUCI: null });
+        return;
+      }
+      let evalCp = 0;
+      let resolved = false;
+
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          this.engine.listener = () => {};
+          resolve({ evalCp, bestMoveUCI: null });
+        }
+      }, 6000);
+
+      this.engine.listener = (line) => {
+        if (line.startsWith('info') && line.includes(' depth ')) {
+          const cpMatch = line.match(/score cp (-?\d+)/);
+          if (cpMatch) evalCp = parseInt(cpMatch[1]);
+          const mateMatch = line.match(/score mate (-?\d+)/);
+          if (mateMatch) evalCp = parseInt(mateMatch[1]) > 0 ? 10000 : -10000;
+        } else if (line.startsWith('bestmove') && !resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          this.engine.listener = () => {};
+          const parts = line.split(' ');
+          const bestMoveUCI = (parts[1] && parts[1] !== '(none)') ? parts[1] : null;
+          resolve({ evalCp, bestMoveUCI });
+        }
+      };
+
+      this.engine.sendCommand('setoption name Skill Level value 20');
+      this.engine.sendCommand(`position fen ${fen}`);
+      this.engine.sendCommand('go depth 12');
+    });
+  }
+
+  // 기물 이동 이력으로 캐슬링 권한 재계산
+  computeCastlingRightsAtMove(moveHistory, moveIndex) {
+    const rights = {
+      white: { kingSide: true, queenSide: true },
+      black: { kingSide: true, queenSide: true }
+    };
+    for (let i = 0; i < moveIndex && i < moveHistory.length; i++) {
+      const move = moveHistory[i];
+      if (!move) break;
+      if (move.piece === 'king') {
+        rights[move.color].kingSide = false;
+        rights[move.color].queenSide = false;
+      } else if (move.piece === 'rook') {
+        if (move.color === 'white') {
+          if (move.from[0] === 7 && move.from[1] === 0) rights.white.queenSide = false;
+          if (move.from[0] === 7 && move.from[1] === 7) rights.white.kingSide = false;
+        } else {
+          if (move.from[0] === 0 && move.from[1] === 0) rights.black.queenSide = false;
+          if (move.from[0] === 0 && move.from[1] === 7) rights.black.kingSide = false;
+        }
+      }
+    }
+    return rights;
+  }
+
+  // 보드 → FEN (분석용, board 배열 직접 전달)
+  boardToFenForAnalysis(board, turn, castlingRights, lastMove) {
+    const pieceMap = { pawn: 'p', rook: 'r', knight: 'n', bishop: 'b', queen: 'q', king: 'k' };
+    let fen = '';
+    for (let row = 0; row < 8; row++) {
+      let empty = 0;
+      for (let col = 0; col < 8; col++) {
+        const piece = board[row][col];
+        if (!piece) {
+          empty++;
+        } else {
+          if (empty > 0) { fen += empty; empty = 0; }
+          const ch = pieceMap[piece.type] || 'p';
+          fen += piece.color === 'white' ? ch.toUpperCase() : ch;
+        }
+      }
+      if (empty > 0) fen += empty;
+      if (row < 7) fen += '/';
+    }
+    fen += ' ' + (turn === 'white' ? 'w' : 'b');
+    let castling = '';
+    if (castlingRights?.white?.kingSide)  castling += 'K';
+    if (castlingRights?.white?.queenSide) castling += 'Q';
+    if (castlingRights?.black?.kingSide)  castling += 'k';
+    if (castlingRights?.black?.queenSide) castling += 'q';
+    fen += ' ' + (castling || '-');
+    let enPassant = '-';
+    if (lastMove && lastMove.special === 'double_move') {
+      const file = String.fromCharCode(97 + lastMove.to[1]);
+      const rank = lastMove.color === 'white' ? 3 : 6;
+      enPassant = file + rank;
+    }
+    fen += ' ' + enPassant + ' 0 1';
+    return fen;
+  }
+
+  // 게임 전체 분석
+  async analyzeGameData(socket, moveHistory, boardHistory) {
+    if (this.isAnalyzing) {
+      socket.emit('analysisError', '이미 분석이 진행 중입니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+    if (!this.ready || !this.engine) {
+      socket.emit('analysisError', '분석 엔진이 준비되지 않았습니다.');
+      return;
+    }
+    this.isAnalyzing = true;
+    const positionEvals = [];
+
+    try {
+      for (let i = 0; i < boardHistory.length; i++) {
+        if (socket.disconnected) break;
+        const board = boardHistory[i];
+        const turn = i === 0 ? 'white' : (moveHistory[i - 1].color === 'white' ? 'black' : 'white');
+        const castlingRights = this.computeCastlingRightsAtMove(moveHistory, i);
+        const lastMove = i > 0 ? moveHistory[i - 1] : null;
+        const fen = this.boardToFenForAnalysis(board, turn, castlingRights, lastMove);
+        const result = await this.analyzePosition(fen);
+        // 항상 백 기준으로 평가값 저장
+        const evalWhite = turn === 'white' ? result.evalCp : -result.evalCp;
+        positionEvals.push({ evalCp: evalWhite, bestMoveUCI: result.bestMoveUCI });
+        socket.emit('analysisProgress', {
+          current: i + 1,
+          total: boardHistory.length,
+          percent: Math.round((i + 1) / boardHistory.length * 100)
+        });
+      }
+
+      // 수 품질 분류
+      const cols = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+      const moveAnalysis = moveHistory.map((move, i) => {
+        const evalBefore = positionEvals[i] ? positionEvals[i].evalCp : 0;
+        const evalAfter  = positionEvals[i + 1] ? positionEvals[i + 1].evalCp : evalBefore;
+        const bestMoveUCI = positionEvals[i] ? positionEvals[i].bestMoveUCI : null;
+        // 실수 크기 계산 (수를 둔 측 기준)
+        const cpLoss = move.color === 'white'
+          ? (evalBefore - evalAfter)   // 백: eval이 떨어지면 손실
+          : (evalAfter - evalBefore);  // 흑: eval이 오르면 손실
+        // 플레이한 수와 최선 수 비교
+        const playedUCI = cols[move.from[1]] + (8 - move.from[0]) + cols[move.to[1]] + (8 - move.to[0]);
+        const isBestMove = bestMoveUCI && playedUCI.startsWith(bestMoveUCI.substring(0, 4));
+        let quality;
+        if (isBestMove || cpLoss <= 5)    quality = 'best';
+        else if (cpLoss <= 20)            quality = 'excellent';
+        else if (cpLoss <= 50)            quality = 'good';
+        else if (cpLoss <= 100)           quality = 'inaccuracy';
+        else if (cpLoss <= 300)           quality = 'mistake';
+        else                              quality = 'blunder';
+        return { quality, cpLoss: Math.round(cpLoss), bestMoveUCI };
+      });
+
+      socket.emit('analysisComplete', {
+        positionEvals: positionEvals.map(p => p.evalCp),
+        moveAnalysis
+      });
+    } catch (err) {
+      console.error('게임 분석 오류:', err);
+      socket.emit('analysisError', '분석 중 오류가 발생했습니다.');
+    } finally {
+      this.isAnalyzing = false;
+    }
   }
 }
 
