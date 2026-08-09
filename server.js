@@ -323,6 +323,7 @@ class ChessGame {
       socket.on('sendChatMessage', (data) => this.handleChatMessage(socket, data));
       socket.on('sendSpectatorMessage', (data) => this.handleSpectatorMessage(socket, data));
       socket.on('requestAnalysis', (data) => this.handleAnalysis(socket, data));
+      socket.on('requestHint', (data) => this.handleHintRequest(socket, data));
       socket.on('disconnect', () => this.handleDisconnect(socket));
     });
   }
@@ -609,6 +610,8 @@ class ChessGame {
       white: { kingSide: true, queenSide: true },
       black: { kingSide: true, queenSide: true }
     };
+    room.hintUsage = { white: 0, black: 0 };
+    room.hintMoveNums = [];
     if (room.timeControl && room.timeControl.enabled) {
       room.timers = { white: room.timeControl.initial, black: room.timeControl.initial };
       room.lastMoveTime = null;
@@ -694,6 +697,75 @@ class ChessGame {
       return;
     }
     await stockfishAI.analyzeGameData(socket, moveHistory, boardHistory);
+  }
+
+  async handleHintRequest(socket, data) {
+    const { roomId } = data;
+    const room = this.games[roomId];
+
+    if (!room || room.status !== 'playing') {
+      socket.emit('hintError', '게임이 진행 중이지 않습니다.');
+      return;
+    }
+
+    const isWhitePlayer = room.players.white === socket.id;
+    const isBlackPlayer = room.players.black === socket.id;
+
+    if (!isWhitePlayer && !isBlackPlayer) {
+      socket.emit('hintError', '플레이어가 아닙니다.');
+      return;
+    }
+
+    const playerColor = isWhitePlayer ? 'white' : 'black';
+
+    if (room.currentTurn !== playerColor) {
+      socket.emit('hintError', '당신의 턴이 아닙니다.');
+      return;
+    }
+
+    if (!room.hintUsage) room.hintUsage = { white: 0, black: 0 };
+    const MAX_HINTS = 3;
+
+    if (room.hintUsage[playerColor] >= MAX_HINTS) {
+      socket.emit('hintError', `힌트를 모두 사용했습니다. (최대 ${MAX_HINTS}회)`);
+      return;
+    }
+
+    // AI 게임: 난이도별 힌트 품질 / 일반 게임: 최선의 수(hard)
+    const difficulty = room.isAI ? room.aiDifficulty : 'hard';
+
+    try {
+      const hintMove = await stockfishAI.getBestMove(
+        room.board,
+        playerColor,
+        difficulty,
+        room.moveHistory || [],
+        room.castlingRights
+      );
+
+      if (!hintMove) {
+        socket.emit('hintError', '힌트를 가져올 수 없습니다.');
+        return;
+      }
+
+      room.hintUsage[playerColor]++;
+      // 현재 수 번호에 힌트 사용 표시 저장
+      if (!room.hintMoveNums) room.hintMoveNums = [];
+      room.hintMoveNums.push(room.moveHistory.length); // 이 수 이후 첫 번째 이동이 힌트 수
+
+      socket.emit('hintResult', {
+        from: hintMove.from,
+        to: hintMove.to,
+        hintsUsed: room.hintUsage[playerColor],
+        maxHints: MAX_HINTS,
+        difficulty
+      });
+
+      console.log(`[힌트] ${roomId} - ${playerColor}, 사용 ${room.hintUsage[playerColor]}/${MAX_HINTS}, 난이도: ${difficulty}`);
+    } catch (err) {
+      console.error('힌트 요청 오류:', err);
+      socket.emit('hintError', '힌트를 가져오는 중 오류가 발생했습니다.');
+    }
   }
 
   handleDisconnect(socket) {
@@ -813,6 +885,8 @@ class ChessGame {
         white: { kingSide: true, queenSide: true },
         black: { kingSide: true, queenSide: true }
       },
+      hintUsage: { white: 0, black: 0 },
+      hintMoveNums: [],
       timeControl: tc,
       timers: tc.enabled ? { white: tc.initial, black: tc.initial } : null,
       timerInterval: null,
