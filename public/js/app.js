@@ -51,6 +51,12 @@ const gameState = {
   spectatorName: '',
   timeControl: null,
   timers: null,
+  hint: {
+    hintsUsed: 0,
+    maxHints: 3,
+    active: false,
+    usedAtMoves: new Set() // 힌트를 사용한 수 번호 추적
+  },
   audioLoaded: {
     check: false,
     checkmate: false,
@@ -175,6 +181,10 @@ const elements = {
   moveCpLoss: document.getElementById('moveCpLoss'),
   bestMoveInfo: document.getElementById('bestMoveInfo'),
   bestMoveText: document.getElementById('bestMoveText'),
+
+  // 힌트
+  hintBtn: document.getElementById('hintBtn'),
+  hintCountBadge: document.getElementById('hintCountBadge'),
 
   // 타이머
   timeModeSelect: document.getElementById('timeModeSelect'),
@@ -455,6 +465,8 @@ class RoomManager {
     UIManager.showScreen('lobby');
     TimerManager.hide();
     ChatManager.clearChat();
+    HintManager.hide();
+    HintManager.reset();
     // 채팅 카드 복원
     const chatCard = document.getElementById('chatCard');
     if (chatCard) chatCard.style.display = '';
@@ -1068,6 +1080,9 @@ class EventManager {
     ChatManager.init();
     SpectatorChatManager.init();
 
+    // 힌트 이벤트 초기화
+    HintManager.initEvents();
+
     // 소켓 이벤트
     EventManager.setupSocketEvents();
   }
@@ -1105,6 +1120,10 @@ class EventManager {
       // AI 게임에서는 채팅 숨기기
       const chatCard = document.getElementById('chatCard');
       if (chatCard) chatCard.style.display = 'none';
+
+      // 힌트 초기화 및 표시
+      HintManager.reset();
+      HintManager.show();
 
       UIManager.showNotification('AI 대전 시작! 당신은 백 (선공)입니다.');
     });
@@ -1160,6 +1179,10 @@ class EventManager {
 
       TimerManager.init(data.timeControl, data.timers);
 
+      // 힌트 초기화 및 표시
+      HintManager.reset();
+      HintManager.show();
+
       if (gameState.myTurn) {
         UIManager.showNotification('게임이 시작되었습니다. 당신의 턴입니다.');
       } else {
@@ -1168,6 +1191,10 @@ class EventManager {
     });
 
     socket.on('boardUpdate', (data) => {
+      // 힌트 사용 기록 처리 (이동 완료)
+      const moveIdx = ReplayManager.boardHistory ? ReplayManager.boardHistory.length : 0;
+      HintManager.onMoveMade(moveIdx);
+
       // 턴 정보를 먼저 업데이트
       gameState.currentTurn = data.turn;
       gameState.myTurn = gameState.playerColor === data.turn;
@@ -1210,8 +1237,12 @@ class EventManager {
       if (data.status === 'checkmate') {
         elements.gameStatusEl.textContent = '체크메이트!';
         elements.restartBtn.style.display = 'block';
+        HintManager.hide();
       } else if (gameState.myTurn) {
         UIManager.showNotification('당신의 턴입니다.');
+        HintManager.updateButton();
+      } else {
+        HintManager.updateButton();
       }
     });
 
@@ -1230,6 +1261,7 @@ class EventManager {
       elements.gameStatusEl.textContent = `게임 종료: ${data.message}`;
       elements.gameStatusEl.className = data.winner === gameState.playerColor ? 'win-status' : 'lose-status';
       elements.restartBtn.style.display = 'block';
+      HintManager.hide();
 
       if (data.moveHistory && data.boardHistory && data.moveHistory.length > 0) {
         ReplayManager.setData(data.moveHistory, data.boardHistory);
@@ -1250,6 +1282,14 @@ class EventManager {
       AnalysisManager.onError(msg);
     });
 
+    socket.on('hintResult', (data) => {
+      HintManager.onHintResult(data);
+    });
+
+    socket.on('hintError', (msg) => {
+      HintManager.onHintError(msg);
+    });
+
     socket.on('gameRestarted', (data) => {
       gameState.currentTurn = data.turn;
       gameState.myTurn = gameState.playerColor === data.turn;
@@ -1260,6 +1300,8 @@ class EventManager {
       elements.gameStatusEl.className = '';
       elements.restartBtn.style.display = 'none';
       if (elements.replayBtn) elements.replayBtn.style.display = 'none';
+      HintManager.reset();
+      HintManager.show();
 
       TimerManager.init(data.timeControl, data.timers);
 
@@ -1974,6 +2016,130 @@ class AnalysisManager {
   }
 }
 
+// ── 힌트 매니저 ──────────────────────────────────────────────
+class HintManager {
+  static MAX_HINTS = 3;
+
+  static reset() {
+    gameState.hint.hintsUsed = 0;
+    gameState.hint.maxHints = this.MAX_HINTS;
+    gameState.hint.active = false;
+    gameState.hint.usedAtMoves = new Set();
+    this.clearHighlight();
+    this.updateButton();
+  }
+
+  static show() {
+    if (!elements.hintBtn) return;
+    elements.hintBtn.style.display = 'block';
+    this.updateButton();
+  }
+
+  static hide() {
+    if (!elements.hintBtn) return;
+    elements.hintBtn.style.display = 'none';
+    this.clearHighlight();
+  }
+
+  static updateButton() {
+    if (!elements.hintBtn) return;
+    const remaining = this.MAX_HINTS - gameState.hint.hintsUsed;
+    if (elements.hintCountBadge) elements.hintCountBadge.textContent = remaining;
+
+    if (remaining <= 0 || !gameState.myTurn) {
+      elements.hintBtn.disabled = true;
+    } else {
+      elements.hintBtn.disabled = false;
+    }
+
+    // 남은 횟수에 따른 색상 변화
+    if (elements.hintCountBadge) {
+      if (remaining === 0) {
+        elements.hintCountBadge.style.background = '#e74c3c';
+      } else if (remaining === 1) {
+        elements.hintCountBadge.style.background = '#e67e22';
+      } else {
+        elements.hintCountBadge.style.background = '';
+      }
+    }
+  }
+
+  static requestHint() {
+    if (!gameState.myTurn || !gameState.currentRoom) return;
+    if (gameState.hint.hintsUsed >= this.MAX_HINTS) {
+      UIManager.showNotification(`힌트를 모두 사용했습니다. (최대 ${this.MAX_HINTS}회)`);
+      return;
+    }
+
+    // 로딩 상태 표시
+    elements.hintBtn.classList.add('hint-loading');
+    elements.hintBtn.disabled = true;
+
+    socket.emit('requestHint', { roomId: gameState.currentRoom });
+  }
+
+  static onHintResult(data) {
+    elements.hintBtn.classList.remove('hint-loading');
+
+    gameState.hint.hintsUsed = data.hintsUsed;
+    gameState.hint.active = true;
+
+    // 현재 수 번호(이 힌트를 사용한 이후 첫 이동)에 표시할 인덱스
+    // moveHistory는 아직 이 수가 추가되기 전이므로 boardHistory.length - 1 이후가 됨
+    const nextMoveIdx = ReplayManager.boardHistory ? ReplayManager.boardHistory.length : 0;
+    // 이 수(nextMoveIdx)가 힌트를 사용한 수임을 임시 저장
+    gameState.hint._nextMoveIdx = nextMoveIdx;
+
+    // 보드에 힌트 강조 표시
+    this.showHighlight(data.from, data.to);
+    this.updateButton();
+
+    const diffLabels = { easy: '쉬움', medium: '보통', hard: '어려움' };
+    const diffLabel = diffLabels[data.difficulty] || '보통';
+    const remaining = this.MAX_HINTS - data.hintsUsed;
+    UIManager.showNotification(`💡 힌트 표시됨 [${diffLabel}] — 남은 횟수: ${remaining}회`);
+  }
+
+  static onHintError(msg) {
+    if (elements.hintBtn) {
+      elements.hintBtn.classList.remove('hint-loading');
+      elements.hintBtn.disabled = gameState.hint.hintsUsed >= this.MAX_HINTS || !gameState.myTurn;
+    }
+    UIManager.showNotification(`힌트 오류: ${msg}`);
+  }
+
+  static showHighlight(from, to) {
+    this.clearHighlight();
+    const fromSq = document.querySelector(`[data-row="${from[0]}"][data-col="${from[1]}"]`);
+    const toSq   = document.querySelector(`[data-row="${to[0]}"][data-col="${to[1]}"]`);
+    if (fromSq) fromSq.classList.add('hint-from');
+    if (toSq)   toSq.classList.add('hint-to');
+  }
+
+  static clearHighlight() {
+    document.querySelectorAll('.hint-from, .hint-to').forEach(sq => {
+      sq.classList.remove('hint-from', 'hint-to');
+    });
+    gameState.hint.active = false;
+  }
+
+  // 이동 완료 시 호출: 힌트 사용 기록 처리
+  static onMoveMade(moveIndex) {
+    if (gameState.hint._nextMoveIdx !== undefined && gameState.hint._nextMoveIdx === moveIndex) {
+      gameState.hint.usedAtMoves.add(moveIndex);
+      gameState.hint._nextMoveIdx = undefined;
+    }
+    this.clearHighlight();
+    this.updateButton();
+  }
+
+  static initEvents() {
+    if (elements.hintBtn) {
+      elements.hintBtn.addEventListener('click', () => HintManager.requestHint());
+    }
+  }
+}
+
 // ──────────────────────────────────────────────────────────────
 
 class ReplayManager {
@@ -2164,6 +2330,15 @@ class ReplayManager {
       const notation = document.createElement('span');
       notation.textContent = this.formatMove(move, cols);
       el.appendChild(notation);
+
+      // 힌트 사용 배지
+      if (gameState.hint.usedAtMoves.has(moveIdx + 1)) {
+        const hintBadge = document.createElement('span');
+        hintBadge.className = 'hint-move-badge';
+        hintBadge.textContent = '💡';
+        hintBadge.title = '힌트를 사용한 수';
+        el.appendChild(hintBadge);
+      }
 
       // 분석 배지
       if (hasAnalysis && AnalysisManager.moveAnalysis[moveIdx]) {
