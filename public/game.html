@@ -269,6 +269,13 @@
                   <i class="fas fa-lightbulb"></i> 힌트
                   <span class="hint-count-badge" id="hintCountBadge">3</span>
                 </button>
+                <button id="takebackBtn" class="btn btn-outline" style="display:none;">
+                  <i class="fas fa-undo"></i> 무르기
+                  <span class="hint-count-badge" id="takebackCountBadge">3</span>
+                </button>
+                <button id="drawOfferBtn" class="btn btn-outline" style="display:none;">
+                  <i class="fas fa-handshake"></i> 무승부 제안
+                </button>
                 <button id="restartBtn" class="btn btn-primary" style="display:none;">
                   <i class="fas fa-redo"></i> 다시 시작
                 </button>
@@ -513,6 +520,40 @@
             <div id="replayMoveList" style="max-height:340px;overflow-y:auto;display:grid;grid-template-columns:auto 1fr 1fr;gap:3px;font-size:0.82rem;"></div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 무르기 요청 다이얼로그 -->
+  <div id="takebackDialog" class="game-request-dialog" style="display:none;">
+    <div class="game-request-content">
+      <div class="game-request-icon"><i class="fas fa-undo"></i></div>
+      <h4>무르기 요청</h4>
+      <p id="takebackDialogMsg">상대방이 무르기를 요청했습니다.</p>
+      <div class="game-request-actions">
+        <button id="takebackAcceptBtn" class="btn btn-primary btn-sm">
+          <i class="fas fa-check"></i> 수락
+        </button>
+        <button id="takebackRejectBtn" class="btn btn-outline btn-sm">
+          <i class="fas fa-times"></i> 거절
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 무승부 제안 다이얼로그 -->
+  <div id="drawDialog" class="game-request-dialog" style="display:none;">
+    <div class="game-request-content">
+      <div class="game-request-icon"><i class="fas fa-handshake"></i></div>
+      <h4>무승부 제안</h4>
+      <p id="drawDialogMsg">상대방이 무승부를 제안했습니다.</p>
+      <div class="game-request-actions">
+        <button id="drawAcceptBtn" class="btn btn-primary btn-sm">
+          <i class="fas fa-check"></i> 수락
+        </button>
+        <button id="drawRejectBtn" class="btn btn-outline btn-sm">
+          <i class="fas fa-times"></i> 거절
+        </button>
       </div>
     </div>
   </div>

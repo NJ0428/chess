@@ -324,6 +324,10 @@ class ChessGame {
       socket.on('sendSpectatorMessage', (data) => this.handleSpectatorMessage(socket, data));
       socket.on('requestAnalysis', (data) => this.handleAnalysis(socket, data));
       socket.on('requestHint', (data) => this.handleHintRequest(socket, data));
+      socket.on('requestTakeback', (data) => this.handleTakebackRequest(socket, data));
+      socket.on('respondTakeback', (data) => this.handleTakebackResponse(socket, data));
+      socket.on('offerDraw', (data) => this.handleDrawOffer(socket, data));
+      socket.on('respondDraw', (data) => this.handleDrawResponse(socket, data));
       socket.on('disconnect', () => this.handleDisconnect(socket));
     });
   }
@@ -578,6 +582,20 @@ class ChessGame {
       socket.emit('error', room ? '당신의 턴이 아닙니다.' : '존재하지 않는 방입니다.');
       return;
     }
+    // 이동 시 무승부 제안 자동 취소
+    if (room.pendingDraw) {
+      const offererSocketId = room.pendingDraw.offerer === 'white' ? room.players.white : room.players.black;
+      const responderSocketId = room.pendingDraw.offerer === 'white' ? room.players.black : room.players.white;
+      room.pendingDraw = null;
+      io.to(offererSocketId).emit('drawCancelled', { message: '상대방이 이동했습니다. 무승부 제안이 취소되었습니다.' });
+      io.to(responderSocketId).emit('drawCancelled', { message: '상대방의 이동으로 무승부 제안이 취소되었습니다.' });
+    }
+    // 이동 시 무르기 요청 자동 취소
+    if (room.pendingTakeback) {
+      const requesterSocketId = room.pendingTakeback.requester === 'white' ? room.players.white : room.players.black;
+      room.pendingTakeback = null;
+      io.to(requesterSocketId).emit('takebackCancelled', { message: '상대방이 이동했습니다. 무르기 요청이 취소되었습니다.' });
+    }
     const moveResult = ChessRules.isValidMove(room.board, from, to, color, room.moveHistory, room.castlingRights);
     if (moveResult.valid) {
       const gameResult = this.processMove(room, from, to, moveResult);
@@ -612,6 +630,13 @@ class ChessGame {
     };
     room.hintUsage = { white: 0, black: 0 };
     room.hintMoveNums = [];
+    room.takebackUsage = { white: 0, black: 0 };
+    room.pendingTakeback = null;
+    room.pendingDraw = null;
+    room.castlingRightsHistory = [JSON.parse(JSON.stringify({
+      white: { kingSide: true, queenSide: true },
+      black: { kingSide: true, queenSide: true }
+    }))];
     if (room.timeControl && room.timeControl.enabled) {
       room.timers = { white: room.timeControl.initial, black: room.timeControl.initial };
       room.lastMoveTime = null;
@@ -768,6 +793,179 @@ class ChessGame {
     }
   }
 
+  handleTakebackRequest(socket, data) {
+    const { roomId } = data;
+    const room = this.games[roomId];
+
+    if (!room || room.status !== 'playing') {
+      return socket.emit('takebackError', '게임이 진행 중이지 않습니다.');
+    }
+    if (room.isAI) {
+      return socket.emit('takebackError', 'AI 대전에서는 무르기를 사용할 수 없습니다.');
+    }
+
+    const isWhite = room.players.white === socket.id;
+    const isBlack = room.players.black === socket.id;
+    if (!isWhite && !isBlack) return socket.emit('takebackError', '플레이어가 아닙니다.');
+
+    const playerColor = isWhite ? 'white' : 'black';
+    const MAX_TAKEBACKS = 3;
+
+    if (!room.takebackUsage) room.takebackUsage = { white: 0, black: 0 };
+    if (room.takebackUsage[playerColor] >= MAX_TAKEBACKS) {
+      return socket.emit('takebackError', `무르기를 모두 사용했습니다. (최대 ${MAX_TAKEBACKS}회)`);
+    }
+    if (room.pendingTakeback) {
+      return socket.emit('takebackError', '이미 무르기 요청이 진행 중입니다.');
+    }
+    if (room.moveHistory.length === 0) {
+      return socket.emit('takebackError', '무를 수가 없습니다. (아직 이동이 없습니다)');
+    }
+
+    // 요청 플레이어의 마지막 이동 찾기
+    const reversedHistory = [...room.moveHistory].reverse();
+    const lastMoveByRequesterIdx = reversedHistory.findIndex(m => m.color === playerColor);
+    if (lastMoveByRequesterIdx === -1) {
+      return socket.emit('takebackError', '무를 수가 없습니다. (아직 이동하지 않았습니다)');
+    }
+    const pliesToUndo = lastMoveByRequesterIdx + 1;
+
+    room.pendingTakeback = { requester: playerColor, pliesToUndo };
+
+    const opponentSocketId = playerColor === 'white' ? room.players.black : room.players.white;
+    io.to(opponentSocketId).emit('takebackRequested', {
+      requesterColor: playerColor,
+      takebacksUsed: room.takebackUsage[playerColor],
+      maxTakebacks: MAX_TAKEBACKS
+    });
+    socket.emit('takebackPending', { message: '무르기 요청을 보냈습니다. 상대방의 수락을 기다리세요.' });
+    console.log(`[무르기 요청] ${roomId} - ${playerColor}, ${pliesToUndo}수 무르기`);
+  }
+
+  handleTakebackResponse(socket, data) {
+    const { roomId, accept } = data;
+    const room = this.games[roomId];
+    if (!room || !room.pendingTakeback) return;
+
+    const isWhite = room.players.white === socket.id;
+    const isBlack = room.players.black === socket.id;
+    if (!isWhite && !isBlack) return;
+
+    const playerColor = isWhite ? 'white' : 'black';
+    const { requester: requesterColor, pliesToUndo } = room.pendingTakeback;
+    if (playerColor === requesterColor) return; // 요청자는 응답 불가
+
+    room.pendingTakeback = null;
+
+    if (!accept) {
+      const requesterSocketId = requesterColor === 'white' ? room.players.white : room.players.black;
+      io.to(requesterSocketId).emit('takebackRejected', { message: '상대방이 무르기를 거절했습니다.' });
+      return;
+    }
+
+    // 무르기 실행
+    const actualUndo = Math.min(pliesToUndo, room.moveHistory.length);
+    room.moveHistory.splice(-actualUndo);
+    room.boardHistory.splice(-actualUndo);
+    if (room.castlingRightsHistory && room.castlingRightsHistory.length > actualUndo) {
+      room.castlingRightsHistory.splice(-actualUndo);
+    }
+    room.board = JSON.parse(JSON.stringify(room.boardHistory[room.boardHistory.length - 1]));
+    room.castlingRights = room.castlingRightsHistory
+      ? JSON.parse(JSON.stringify(room.castlingRightsHistory[room.castlingRightsHistory.length - 1]))
+      : { white: { kingSide: true, queenSide: true }, black: { kingSide: true, queenSide: true } };
+    room.currentTurn = requesterColor;
+
+    if (!room.takebackUsage) room.takebackUsage = { white: 0, black: 0 };
+    room.takebackUsage[requesterColor]++;
+
+    const takebackData = {
+      board: room.board,
+      turn: room.currentTurn,
+      requesterColor,
+      takebacksUsed: room.takebackUsage[requesterColor],
+      maxTakebacks: 3
+    };
+
+    io.to(room.players.white).emit('takebackAccepted', takebackData);
+    io.to(room.players.black).emit('takebackAccepted', takebackData);
+
+    // 타이머 재시작
+    this.stopPlayerTimer(roomId);
+    this.startPlayerTimer(roomId);
+
+    console.log(`[무르기 수락] ${roomId} - ${requesterColor}, ${actualUndo}수 복원`);
+  }
+
+  handleDrawOffer(socket, data) {
+    const { roomId } = data;
+    const room = this.games[roomId];
+
+    if (!room || room.status !== 'playing') return;
+    if (room.isAI) return socket.emit('drawError', 'AI 대전에서는 무승부 제안을 할 수 없습니다.');
+
+    const isWhite = room.players.white === socket.id;
+    const isBlack = room.players.black === socket.id;
+    if (!isWhite && !isBlack) return;
+
+    const playerColor = isWhite ? 'white' : 'black';
+
+    if (room.pendingDraw) {
+      return socket.emit('drawError', '이미 무승부 제안이 진행 중입니다.');
+    }
+
+    room.pendingDraw = { offerer: playerColor };
+
+    const opponentSocketId = playerColor === 'white' ? room.players.black : room.players.white;
+    io.to(opponentSocketId).emit('drawOffered', { offererColor: playerColor });
+    socket.emit('drawOfferPending', { message: '무승부를 제안했습니다. 상대방의 응답을 기다리세요.' });
+    console.log(`[무승부 제안] ${roomId} - ${playerColor}`);
+  }
+
+  handleDrawResponse(socket, data) {
+    const { roomId, accept } = data;
+    const room = this.games[roomId];
+    if (!room || !room.pendingDraw) return;
+
+    const isWhite = room.players.white === socket.id;
+    const isBlack = room.players.black === socket.id;
+    if (!isWhite && !isBlack) return;
+
+    const playerColor = isWhite ? 'white' : 'black';
+    const offererColor = room.pendingDraw.offerer;
+    if (playerColor === offererColor) return; // 제안자는 응답 불가
+
+    room.pendingDraw = null;
+
+    if (!accept) {
+      const offererSocketId = offererColor === 'white' ? room.players.white : room.players.black;
+      io.to(offererSocketId).emit('drawRejected', { message: '상대방이 무승부를 거절했습니다.' });
+      return;
+    }
+
+    // 무승부 처리
+    if (room.timerInterval) {
+      clearInterval(room.timerInterval);
+      room.timerInterval = null;
+    }
+    room.status = 'finished';
+
+    const replayData = { moveHistory: room.moveHistory || [], boardHistory: room.boardHistory || [] };
+    const drawMessage = '합의에 의한 무승부';
+
+    io.to(room.players.white).emit('gameOver', { winner: 'draw', message: drawMessage, ...replayData });
+    io.to(room.players.black).emit('gameOver', { winner: 'draw', message: drawMessage, ...replayData });
+
+    if (this.spectators[roomId]) {
+      for (const sid in this.spectators[roomId]) {
+        io.to(sid).emit('gameEnded', { reason: drawMessage });
+      }
+    }
+
+    this.recordGameEnd(roomId, 'draw', 'draw').catch(err => console.error('무승부 통계 기록 실패:', err));
+    console.log(`[무승부] ${roomId} - 합의`);
+  }
+
   handleDisconnect(socket) {
     console.log('사용자 연결 해제:', socket.id);
     for (const roomId in this.games) {
@@ -887,6 +1085,13 @@ class ChessGame {
       },
       hintUsage: { white: 0, black: 0 },
       hintMoveNums: [],
+      takebackUsage: { white: 0, black: 0 },
+      pendingTakeback: null,
+      pendingDraw: null,
+      castlingRightsHistory: [JSON.parse(JSON.stringify({
+        white: { kingSide: true, queenSide: true },
+        black: { kingSide: true, queenSide: true }
+      }))],
       timeControl: tc,
       timers: tc.enabled ? { white: tc.initial, black: tc.initial } : null,
       timerInterval: null,
@@ -920,6 +1125,8 @@ class ChessGame {
       special: moveDetails.special
     });
     this.updateCastlingRights(room, from, movingPiece);
+    if (!room.castlingRightsHistory) room.castlingRightsHistory = [];
+    room.castlingRightsHistory.push(JSON.parse(JSON.stringify(room.castlingRights)));
     if (this.gameStats[room.roomId || Object.keys(this.games).find(id => this.games[id] === room)]) {
       const roomId = room.roomId || Object.keys(this.games).find(id => this.games[id] === room);
       this.gameStats[roomId].moveCount++;
