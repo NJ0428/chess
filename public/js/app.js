@@ -186,6 +186,21 @@ const elements = {
   hintBtn: document.getElementById('hintBtn'),
   hintCountBadge: document.getElementById('hintCountBadge'),
 
+  // 무르기
+  takebackBtn: document.getElementById('takebackBtn'),
+  takebackCountBadge: document.getElementById('takebackCountBadge'),
+  takebackDialog: document.getElementById('takebackDialog'),
+  takebackDialogMsg: document.getElementById('takebackDialogMsg'),
+  takebackAcceptBtn: document.getElementById('takebackAcceptBtn'),
+  takebackRejectBtn: document.getElementById('takebackRejectBtn'),
+
+  // 무승부 제안
+  drawOfferBtn: document.getElementById('drawOfferBtn'),
+  drawDialog: document.getElementById('drawDialog'),
+  drawDialogMsg: document.getElementById('drawDialogMsg'),
+  drawAcceptBtn: document.getElementById('drawAcceptBtn'),
+  drawRejectBtn: document.getElementById('drawRejectBtn'),
+
   // 타이머
   timeModeSelect: document.getElementById('timeModeSelect'),
   incrementGroup: document.getElementById('incrementGroup'),
@@ -1083,6 +1098,10 @@ class EventManager {
     // 힌트 이벤트 초기화
     HintManager.initEvents();
 
+    // 무르기 / 무승부 이벤트 초기화
+    TakebackManager.initEvents();
+    DrawManager.initEvents();
+
     // 소켓 이벤트
     EventManager.setupSocketEvents();
   }
@@ -1124,6 +1143,10 @@ class EventManager {
       // 힌트 초기화 및 표시
       HintManager.reset();
       HintManager.show();
+
+      // AI 대전: 무르기/무승부 숨기기
+      TakebackManager.hide();
+      DrawManager.hide();
 
       UIManager.showNotification('AI 대전 시작! 당신은 백 (선공)입니다.');
     });
@@ -1183,6 +1206,12 @@ class EventManager {
       HintManager.reset();
       HintManager.show();
 
+      // 무르기/무승부 초기화 및 표시
+      TakebackManager.reset();
+      TakebackManager.show();
+      DrawManager.reset();
+      DrawManager.show();
+
       if (gameState.myTurn) {
         UIManager.showNotification('게임이 시작되었습니다. 당신의 턴입니다.');
       } else {
@@ -1238,6 +1267,8 @@ class EventManager {
         elements.gameStatusEl.textContent = '체크메이트!';
         elements.restartBtn.style.display = 'block';
         HintManager.hide();
+        TakebackManager.hide();
+        DrawManager.hide();
       } else if (gameState.myTurn) {
         UIManager.showNotification('당신의 턴입니다.');
         HintManager.updateButton();
@@ -1259,9 +1290,15 @@ class EventManager {
       gameState.myTurn = false;
 
       elements.gameStatusEl.textContent = `게임 종료: ${data.message}`;
-      elements.gameStatusEl.className = data.winner === gameState.playerColor ? 'win-status' : 'lose-status';
+      if (data.winner === 'draw' || data.winner === null) {
+        elements.gameStatusEl.className = 'draw-status';
+      } else {
+        elements.gameStatusEl.className = data.winner === gameState.playerColor ? 'win-status' : 'lose-status';
+      }
       elements.restartBtn.style.display = 'block';
       HintManager.hide();
+      TakebackManager.hide();
+      DrawManager.hide();
 
       if (data.moveHistory && data.boardHistory && data.moveHistory.length > 0) {
         ReplayManager.setData(data.moveHistory, data.boardHistory);
@@ -1290,6 +1327,55 @@ class EventManager {
       HintManager.onHintError(msg);
     });
 
+    // 무르기 이벤트
+    socket.on('takebackPending', (data) => {
+      TakebackManager.onPending(data);
+    });
+
+    socket.on('takebackRequested', (data) => {
+      TakebackManager.showDialog(data);
+    });
+
+    socket.on('takebackAccepted', (data) => {
+      TakebackManager.hideDialog();
+      TakebackManager.onAccepted(data);
+    });
+
+    socket.on('takebackRejected', (data) => {
+      TakebackManager.onRejected(data);
+    });
+
+    socket.on('takebackCancelled', (data) => {
+      TakebackManager.onCancelled(data);
+    });
+
+    socket.on('takebackError', (msg) => {
+      TakebackManager.pendingRequest = false;
+      TakebackManager.updateButton();
+      UIManager.showNotification(`무르기 오류: ${msg}`);
+    });
+
+    // 무승부 이벤트
+    socket.on('drawOfferPending', (data) => {
+      DrawManager.onOfferPending(data);
+    });
+
+    socket.on('drawOffered', (data) => {
+      DrawManager.showDialog(data);
+    });
+
+    socket.on('drawRejected', (data) => {
+      DrawManager.onRejected(data);
+    });
+
+    socket.on('drawCancelled', (data) => {
+      DrawManager.onCancelled(data);
+    });
+
+    socket.on('drawError', (msg) => {
+      UIManager.showNotification(`무승부 오류: ${msg}`);
+    });
+
     socket.on('gameRestarted', (data) => {
       gameState.currentTurn = data.turn;
       gameState.myTurn = gameState.playerColor === data.turn;
@@ -1302,6 +1388,13 @@ class EventManager {
       if (elements.replayBtn) elements.replayBtn.style.display = 'none';
       HintManager.reset();
       HintManager.show();
+
+      if (!gameState.isAIGame) {
+        TakebackManager.reset();
+        TakebackManager.show();
+        DrawManager.reset();
+        DrawManager.show();
+      }
 
       TimerManager.init(data.timeControl, data.timers);
 
@@ -2136,6 +2229,226 @@ class HintManager {
   static initEvents() {
     if (elements.hintBtn) {
       elements.hintBtn.addEventListener('click', () => HintManager.requestHint());
+    }
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+
+class TakebackManager {
+  static MAX_TAKEBACKS = 3;
+  static takebacksUsed = 0;
+  static pendingRequest = false; // 내가 요청 중인지
+
+  static reset() {
+    this.takebacksUsed = 0;
+    this.pendingRequest = false;
+    this.updateButton();
+  }
+
+  static show() {
+    if (!elements.takebackBtn) return;
+    elements.takebackBtn.style.display = 'block';
+    this.updateButton();
+  }
+
+  static hide() {
+    if (!elements.takebackBtn) return;
+    elements.takebackBtn.style.display = 'none';
+    this.hideDialog();
+  }
+
+  static updateButton() {
+    if (!elements.takebackBtn) return;
+    const remaining = this.MAX_TAKEBACKS - this.takebacksUsed;
+    if (elements.takebackCountBadge) {
+      elements.takebackCountBadge.textContent = remaining;
+      if (remaining === 0) {
+        elements.takebackCountBadge.style.background = '#e74c3c';
+      } else if (remaining === 1) {
+        elements.takebackCountBadge.style.background = '#e67e22';
+      } else {
+        elements.takebackCountBadge.style.background = '';
+      }
+    }
+    elements.takebackBtn.disabled = remaining <= 0 || this.pendingRequest || gameState.isSpectating;
+  }
+
+  static requestTakeback() {
+    if (!gameState.currentRoom || gameState.isSpectating || gameState.isAIGame) return;
+    if (this.takebacksUsed >= this.MAX_TAKEBACKS) {
+      UIManager.showNotification(`무르기를 모두 사용했습니다. (최대 ${this.MAX_TAKEBACKS}회)`);
+      return;
+    }
+    if (this.pendingRequest) {
+      UIManager.showNotification('이미 무르기 요청을 보냈습니다. 상대방의 응답을 기다리세요.');
+      return;
+    }
+    this.pendingRequest = true;
+    elements.takebackBtn.disabled = true;
+    socket.emit('requestTakeback', { roomId: gameState.currentRoom });
+  }
+
+  static onPending(data) {
+    UIManager.showNotification(data.message);
+  }
+
+  static onAccepted(data) {
+    this.pendingRequest = false;
+    // 내가 요청자인 경우에만 사용 횟수 반영
+    if (data.requesterColor === gameState.playerColor) {
+      this.takebacksUsed = data.takebacksUsed;
+    }
+    this.updateButton();
+
+    gameState.gameBoard = data.board;
+    gameState.currentTurn = data.turn;
+    gameState.myTurn = gameState.playerColor === data.turn;
+    gameState.selectedSquare = null;
+
+    BoardRenderer.render(data.board);
+    UIManager.updateGameInfo();
+    if (data.requesterColor === gameState.playerColor) {
+      UIManager.showNotification('무르기가 수락되었습니다. 다시 이동하세요.');
+    } else {
+      UIManager.showNotification('무르기 요청을 수락했습니다.');
+    }
+    HintManager.clearHighlight();
+    HintManager.updateButton();
+  }
+
+  static onRejected(data) {
+    this.pendingRequest = false;
+    this.updateButton();
+    UIManager.showNotification(data.message);
+  }
+
+  static onCancelled(data) {
+    this.pendingRequest = false;
+    this.updateButton();
+    this.hideDialog();
+    UIManager.showNotification(data.message);
+  }
+
+  static showDialog(data) {
+    if (!elements.takebackDialog) return;
+    const colorLabel = data.requesterColor === 'white' ? '백' : '흑';
+    if (elements.takebackDialogMsg) {
+      elements.takebackDialogMsg.textContent = `${colorLabel} 플레이어가 무르기를 요청했습니다. (상대 사용 ${data.takebacksUsed + 1}/${data.maxTakebacks}회)`;
+    }
+    elements.takebackDialog.style.display = 'flex';
+  }
+
+  static hideDialog() {
+    if (elements.takebackDialog) elements.takebackDialog.style.display = 'none';
+  }
+
+  static respondTakeback(accept) {
+    this.hideDialog();
+    socket.emit('respondTakeback', { roomId: gameState.currentRoom, accept });
+    if (!accept) {
+      UIManager.showNotification('무르기를 거절했습니다.');
+    }
+  }
+
+  static initEvents() {
+    if (elements.takebackBtn) {
+      elements.takebackBtn.addEventListener('click', () => TakebackManager.requestTakeback());
+    }
+    if (elements.takebackAcceptBtn) {
+      elements.takebackAcceptBtn.addEventListener('click', () => TakebackManager.respondTakeback(true));
+    }
+    if (elements.takebackRejectBtn) {
+      elements.takebackRejectBtn.addEventListener('click', () => TakebackManager.respondTakeback(false));
+    }
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+
+class DrawManager {
+  static pendingOffer = false; // 내가 제안 중인지
+
+  static reset() {
+    this.pendingOffer = false;
+    this.updateButton();
+  }
+
+  static show() {
+    if (!elements.drawOfferBtn) return;
+    elements.drawOfferBtn.style.display = 'block';
+    this.updateButton();
+  }
+
+  static hide() {
+    if (!elements.drawOfferBtn) return;
+    elements.drawOfferBtn.style.display = 'none';
+    this.hideDialog();
+  }
+
+  static updateButton() {
+    if (!elements.drawOfferBtn) return;
+    elements.drawOfferBtn.disabled = this.pendingOffer || gameState.isSpectating;
+  }
+
+  static offerDraw() {
+    if (!gameState.currentRoom || gameState.isSpectating || gameState.isAIGame) return;
+    if (this.pendingOffer) {
+      UIManager.showNotification('이미 무승부를 제안했습니다. 상대방의 응답을 기다리세요.');
+      return;
+    }
+    this.pendingOffer = true;
+    this.updateButton();
+    socket.emit('offerDraw', { roomId: gameState.currentRoom });
+  }
+
+  static onOfferPending(data) {
+    UIManager.showNotification(data.message);
+  }
+
+  static onRejected(data) {
+    this.pendingOffer = false;
+    this.updateButton();
+    UIManager.showNotification(data.message);
+  }
+
+  static onCancelled(data) {
+    this.pendingOffer = false;
+    this.updateButton();
+    this.hideDialog();
+    UIManager.showNotification(data.message);
+  }
+
+  static showDialog(data) {
+    if (!elements.drawDialog) return;
+    const colorLabel = data.offererColor === 'white' ? '백' : '흑';
+    if (elements.drawDialogMsg) {
+      elements.drawDialogMsg.textContent = `${colorLabel} 플레이어가 무승부를 제안했습니다.`;
+    }
+    elements.drawDialog.style.display = 'flex';
+  }
+
+  static hideDialog() {
+    if (elements.drawDialog) elements.drawDialog.style.display = 'none';
+  }
+
+  static respondDraw(accept) {
+    this.hideDialog();
+    socket.emit('respondDraw', { roomId: gameState.currentRoom, accept });
+    if (!accept) {
+      UIManager.showNotification('무승부를 거절했습니다.');
+    }
+  }
+
+  static initEvents() {
+    if (elements.drawOfferBtn) {
+      elements.drawOfferBtn.addEventListener('click', () => DrawManager.offerDraw());
+    }
+    if (elements.drawAcceptBtn) {
+      elements.drawAcceptBtn.addEventListener('click', () => DrawManager.respondDraw(true));
+    }
+    if (elements.drawRejectBtn) {
+      elements.drawRejectBtn.addEventListener('click', () => DrawManager.respondDraw(false));
     }
   }
 }
