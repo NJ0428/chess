@@ -51,6 +51,7 @@ const gameState = {
   spectatorName: '',
   timeControl: null,
   timers: null,
+  lastMove: null, // {from:[r,c], to:[r,c]}
   hint: {
     hintsUsed: 0,
     maxHints: 3,
@@ -659,6 +660,14 @@ class BoardRenderer {
     // 테마 적용
     ThemeManager.applyAll([boardElement]);
 
+    // 마지막 이동 / 체크 하이라이트 (메인 보드만)
+    if (boardElement === elements.board) {
+      if (gameState.lastMove) {
+        this.applyLastMoveHighlight(gameState.lastMove.from, gameState.lastMove.to);
+      }
+      this.applyCheckHighlight(boardData, gameState.currentTurn);
+    }
+
     if (!gameState.isSpectating) {
       UIManager.updateGameInfo();
       UIManager.updateBackgroundColor();
@@ -726,6 +735,29 @@ class BoardRenderer {
       square.classList.remove('selected', ...Object.values(CONSTANTS.MOVE_TYPES));
     });
     gameState.selectedSquare = null;
+  }
+
+  static applyLastMoveHighlight(from, to) {
+    if (!ThemeManager.current.showLastMove || !from || !to) return;
+    const fromSq = document.querySelector(`#board .square[data-row="${from[0]}"][data-col="${from[1]}"]`);
+    const toSq   = document.querySelector(`#board .square[data-row="${to[0]}"][data-col="${to[1]}"]`);
+    if (fromSq) fromSq.classList.add('last-move-from');
+    if (toSq)   toSq.classList.add('last-move-to');
+  }
+
+  static applyCheckHighlight(board, color) {
+    if (!ThemeManager.current.showCheckHighlight || !board) return;
+    if (!GameLogic.isKingInCheck(board, color)) return;
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const p = board[r][c];
+        if (p && p.type === 'king' && p.color === color) {
+          const sq = document.querySelector(`#board .square[data-row="${r}"][data-col="${c}"]`);
+          if (sq) sq.classList.add('king-in-check');
+          return;
+        }
+      }
+    }
   }
 }
 
@@ -1572,9 +1604,9 @@ class ThemeManager {
   };
 
   // 현재 적용된 설정 (로컬 상태)
-  static current = { boardTheme: 'classic', pieceTheme: 'neo', showCoordinates: true };
+  static current = { boardTheme: 'classic', pieceTheme: 'neo', showCoordinates: true, showLastMove: true, showMoveHints: true, showCheckHighlight: true };
   // 모달에서 임시 선택 중인 설정
-  static pending = { boardTheme: 'classic', pieceTheme: 'neo', showCoordinates: true };
+  static pending = { boardTheme: 'classic', pieceTheme: 'neo', showCoordinates: true, showLastMove: true, showMoveHints: true, showCheckHighlight: true };
 
   /* ── 로드 / 저장 ── */
   static async load() {
@@ -1589,10 +1621,14 @@ class ThemeManager {
       const res = await fetch('/api/settings');
       if (res.ok) {
         const data = await res.json();
+        const local = this._fromStorage();
         this.current = {
           boardTheme: data.board_theme || 'classic',
           pieceTheme: data.piece_theme || 'neo',
           showCoordinates: data.show_coordinates !== 0,
+          showLastMove: local.showLastMove !== undefined ? local.showLastMove : true,
+          showMoveHints: local.showMoveHints !== undefined ? local.showMoveHints : true,
+          showCheckHighlight: local.showCheckHighlight !== undefined ? local.showCheckHighlight : true,
         };
         this.pending = { ...this.current };
         this._toStorage(this.current);
@@ -1625,7 +1661,7 @@ class ThemeManager {
       const raw = localStorage.getItem('chessThemeSettings');
       if (raw) return JSON.parse(raw);
     } catch (_) {}
-    return { boardTheme: 'classic', pieceTheme: 'neo', showCoordinates: true };
+    return { boardTheme: 'classic', pieceTheme: 'neo', showCoordinates: true, showLastMove: true, showMoveHints: true, showCheckHighlight: true };
   }
 
   static _toStorage(settings) {
@@ -1729,19 +1765,28 @@ class ThemeManager {
       });
     }
     // 좌표 토글
-    this._updateToggleUI(this.pending.showCoordinates);
+    this._updateToggleUI('coords', this.pending.showCoordinates);
+    this._updateToggleUI('lastMove', this.pending.showLastMove);
+    this._updateToggleUI('moveHints', this.pending.showMoveHints);
+    this._updateToggleUI('checkHighlight', this.pending.showCheckHighlight);
   }
 
-  static _updateToggleUI(on) {
-    if (elements.coordsToggleTrack) {
-      elements.coordsToggleTrack.style.background = on ? 'var(--primary-color)' : 'var(--border-color)';
-    }
-    if (elements.coordsToggleThumb) {
-      elements.coordsToggleThumb.style.left = on ? '24px' : '2px';
-    }
-    if (elements.showCoordsToggle) {
-      elements.showCoordsToggle.checked = on;
-    }
+  static _updateToggleUI(key, on) {
+    // key: 'coords' | 'lastMove' | 'moveHints' | 'checkHighlight'
+    const ids = {
+      coords:         { track: 'coordsToggleTrack',         thumb: 'coordsToggleThumb',         chk: 'showCoordsToggle' },
+      lastMove:       { track: 'lastMoveToggleTrack',       thumb: 'lastMoveToggleThumb',       chk: 'showLastMoveToggle' },
+      moveHints:      { track: 'moveHintsToggleTrack',      thumb: 'moveHintsToggleThumb',      chk: 'showMoveHintsToggle' },
+      checkHighlight: { track: 'checkHighlightToggleTrack', thumb: 'checkHighlightToggleThumb', chk: 'showCheckHighlightToggle' },
+    };
+    const m = ids[key];
+    if (!m) return;
+    const track = document.getElementById(m.track);
+    const thumb = document.getElementById(m.thumb);
+    const chk   = document.getElementById(m.chk);
+    if (track) track.style.background = on ? 'var(--primary-color)' : 'var(--border-color)';
+    if (thumb) thumb.style.left = on ? '24px' : '2px';
+    if (chk)   chk.checked = on;
   }
 
   static initEvents() {
@@ -1783,23 +1828,25 @@ class ThemeManager {
     }
 
     // 좌표 토글
-    if (elements.showCoordsToggle) {
-      elements.showCoordsToggle.addEventListener('change', e => {
-        ThemeManager.pending.showCoordinates = e.target.checked;
-        ThemeManager._updateToggleUI(e.target.checked);
+    // 토글 공통 헬퍼: checkboxId, pendingKey, toggleKey
+    const bindToggle = (checkboxId, trackId, pendingKey, toggleKey) => {
+      const chk = document.getElementById(checkboxId);
+      const track = document.getElementById(trackId);
+      const update = (val) => {
+        ThemeManager.pending[pendingKey] = val;
+        ThemeManager._updateToggleUI(toggleKey, val);
         ThemeManager.renderPreview();
-      });
-    }
-    // 토글 트랙/썸 클릭도 처리
-    const toggleArea = elements.coordsToggleTrack && elements.coordsToggleTrack.parentElement;
-    if (toggleArea) {
-      toggleArea.addEventListener('click', () => {
-        const newVal = !ThemeManager.pending.showCoordinates;
-        ThemeManager.pending.showCoordinates = newVal;
-        ThemeManager._updateToggleUI(newVal);
-        ThemeManager.renderPreview();
-      });
-    }
+      };
+      if (chk) chk.addEventListener('change', e => update(e.target.checked));
+      if (track) {
+        track.parentElement && track.parentElement.addEventListener('click', () => update(!ThemeManager.pending[pendingKey]));
+      }
+    };
+
+    bindToggle('showCoordsToggle',         'coordsToggleTrack',         'showCoordinates',  'coords');
+    bindToggle('showLastMoveToggle',        'lastMoveToggleTrack',       'showLastMove',     'lastMove');
+    bindToggle('showMoveHintsToggle',       'moveHintsToggleTrack',      'showMoveHints',    'moveHints');
+    bindToggle('showCheckHighlightToggle',  'checkHighlightToggleTrack', 'showCheckHighlight','checkHighlight');
 
     // 저장
     if (elements.saveThemeBtn) {

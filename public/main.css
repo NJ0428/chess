@@ -635,6 +635,16 @@ section {
 
 .square.selected { background-color: var(--primary-color) !important; }
 
+/* ── 마지막 이동 하이라이트 ── */
+.square.last-move-from {
+    background-color: rgba(155, 199, 0, 0.38) !important;
+}
+.square.last-move-to {
+    background-color: rgba(155, 199, 0, 0.55) !important;
+}
+/* selected가 last-move-to 위에 올라오도록 */
+.square.selected.last-move-to { background-color: var(--primary-color) !important; }
+
 /* ── 좌표 표시 ── */
 .coord-label {
     display: none; /* 기본: 숨김 */
