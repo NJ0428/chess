@@ -145,6 +145,9 @@ const elements = {
   showCoordsToggle: document.getElementById('showCoordsToggle'),
   coordsToggleTrack: document.getElementById('coordsToggleTrack'),
   coordsToggleThumb: document.getElementById('coordsToggleThumb'),
+  showLastMoveToggle: document.getElementById('showLastMoveToggle'),
+  showMoveHintsToggle: document.getElementById('showMoveHintsToggle'),
+  showCheckHighlightToggle: document.getElementById('showCheckHighlightToggle'),
   boardThemeName: document.getElementById('boardThemeName'),
   themePreviewBoard: document.getElementById('themePreviewBoard'),
   themeSaveMsg: document.getElementById('themeSaveMsg'),
@@ -804,7 +807,9 @@ class GameLogic {
       BoardRenderer.clearSelection();
       square.classList.add('selected');
       gameState.selectedSquare = [row, col];
-      GameLogic.showPossibleMoves(row, col, piece);
+      if (ThemeManager.current.showMoveHints) {
+        GameLogic.showPossibleMoves(row, col, piece);
+      }
     }
   }
 
@@ -1005,6 +1010,66 @@ class GameLogic {
 
   static restartGame() {
     socket.emit('restartGame', gameState.currentRoom);
+  }
+
+  // ── 체크 감지 (클라이언트 사이드) ──
+  static isKingInCheck(board, color) {
+    let kr = -1, kc = -1;
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const p = board[r][c];
+        if (p && p.type === 'king' && p.color === color) { kr = r; kc = c; }
+      }
+    }
+    if (kr === -1) return false;
+    const opp = color === 'white' ? 'black' : 'white';
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        if (board[r][c] && board[r][c].color === opp) {
+          if (this._canAttack(board, r, c, kr, kc)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  static _canAttack(board, fr, fc, tr, tc) {
+    const piece = board[fr][fc];
+    if (!piece) return false;
+    const dr = tr - fr, dc = tc - fc;
+    switch (piece.type) {
+      case 'pawn': {
+        const dir = piece.color === 'white' ? -1 : 1;
+        return dr === dir && Math.abs(dc) === 1;
+      }
+      case 'knight':
+        return (Math.abs(dr) === 2 && Math.abs(dc) === 1) || (Math.abs(dr) === 1 && Math.abs(dc) === 2);
+      case 'rook':
+        return this._straightClear(board, fr, fc, tr, tc);
+      case 'bishop':
+        return this._diagonalClear(board, fr, fc, tr, tc);
+      case 'queen':
+        return this._straightClear(board, fr, fc, tr, tc) || this._diagonalClear(board, fr, fc, tr, tc);
+      case 'king':
+        return Math.abs(dr) <= 1 && Math.abs(dc) <= 1;
+      default: return false;
+    }
+  }
+
+  static _straightClear(board, fr, fc, tr, tc) {
+    if (fr !== tr && fc !== tc) return false;
+    const dr = Math.sign(tr - fr), dc = Math.sign(tc - fc);
+    let r = fr + dr, c = fc + dc;
+    while (r !== tr || c !== tc) { if (board[r][c]) return false; r += dr; c += dc; }
+    return true;
+  }
+
+  static _diagonalClear(board, fr, fc, tr, tc) {
+    if (Math.abs(tr - fr) !== Math.abs(tc - fc)) return false;
+    const dr = Math.sign(tr - fr), dc = Math.sign(tc - fc);
+    let r = fr + dr, c = fc + dc;
+    while (r !== tr || c !== tc) { if (board[r][c]) return false; r += dr; c += dc; }
+    return true;
   }
 }
 
@@ -1234,6 +1299,8 @@ class EventManager {
 
       TimerManager.init(data.timeControl, data.timers);
 
+      gameState.lastMove = null;
+
       // 힌트 초기화 및 표시
       HintManager.reset();
       HintManager.show();
@@ -1259,6 +1326,11 @@ class EventManager {
       // 턴 정보를 먼저 업데이트
       gameState.currentTurn = data.turn;
       gameState.myTurn = gameState.playerColor === data.turn;
+
+      // 마지막 이동 저장
+      if (data.moveDetails && data.moveDetails.from && data.moveDetails.to) {
+        gameState.lastMove = { from: data.moveDetails.from, to: data.moveDetails.to };
+      }
 
       // 보드 렌더링 (이때 올바른 턴 정보로 UI 업데이트됨)
       BoardRenderer.render(data.board);
@@ -1301,10 +1373,17 @@ class EventManager {
         HintManager.hide();
         TakebackManager.hide();
         DrawManager.hide();
-      } else if (gameState.myTurn) {
-        UIManager.showNotification('당신의 턴입니다.');
-        HintManager.updateButton();
       } else {
+        // 체크 여부 클라이언트 감지
+        const inCheck = GameLogic.isKingInCheck(data.board, data.turn);
+        if (inCheck) {
+          audioManager.play('check');
+          elements.gameStatusEl.textContent = '체크!';
+          elements.gameStatusEl.className = 'check-status';
+          UIManager.showNotification('체크!');
+        } else if (gameState.myTurn) {
+          UIManager.showNotification('당신의 턴입니다.');
+        }
         HintManager.updateButton();
       }
     });
