@@ -93,6 +93,20 @@ function initializeDatabase() {
     )
   `;
 
+  const friendshipsTable = `
+    CREATE TABLE IF NOT EXISTS friendships (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      requester_id INTEGER NOT NULL,
+      addressee_id INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (requester_id) REFERENCES users (id),
+      FOREIGN KEY (addressee_id) REFERENCES users (id),
+      UNIQUE(requester_id, addressee_id)
+    )
+  `;
+
   // 테이블들을 순차적으로 생성
   db.run(usersTable, (err) => {
     if (err) {
@@ -134,6 +148,14 @@ function initializeDatabase() {
       console.error('user_settings 테이블 생성 실패:', err);
     } else {
       console.log('user_settings 테이블이 성공적으로 생성되었거나 이미 존재합니다.');
+    }
+  });
+
+  db.run(friendshipsTable, (err) => {
+    if (err) {
+      console.error('friendships 테이블 생성 실패:', err);
+    } else {
+      console.log('friendships 테이블이 성공적으로 생성되었거나 이미 존재합니다.');
     }
   });
 }

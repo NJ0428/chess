@@ -262,6 +262,207 @@ app.get('/api/settings', (req, res) => {
   });
 });
 
+// 유저 검색
+app.get('/api/users/search', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+  const q = (req.query.q || '').trim();
+  if (!q || q.length < 2) {
+    return res.status(400).json({ message: '검색어는 2자 이상이어야 합니다.' });
+  }
+  const sql = `
+    SELECT u.id, u.username, u.nickname, u.elo_rating,
+      f.status as friendship_status,
+      f.requester_id as friendship_requester
+    FROM users u
+    LEFT JOIN friendships f ON (
+      (f.requester_id = ? AND f.addressee_id = u.id) OR
+      (f.addressee_id = ? AND f.requester_id = u.id)
+    )
+    WHERE (u.username LIKE ? OR u.nickname LIKE ?) AND u.id != ?
+    LIMIT 20
+  `;
+  const like = `%${q}%`;
+  db.all(sql, [req.session.userId, req.session.userId, like, like, req.session.userId], (err, rows) => {
+    if (err) return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+    res.json(rows);
+  });
+});
+
+// 친구 목록 조회
+app.get('/api/friends', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+  const sql = `
+    SELECT u.id, u.username, u.nickname, u.elo_rating, u.wins, u.losses, u.draws
+    FROM friendships f
+    JOIN users u ON (
+      CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END = u.id
+    )
+    WHERE (f.requester_id = ? OR f.addressee_id = ?) AND f.status = 'accepted'
+  `;
+  db.all(sql, [req.session.userId, req.session.userId, req.session.userId], (err, rows) => {
+    if (err) return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+    const onlineSet = onlineUsers;
+    const result = rows.map(r => ({
+      ...r,
+      is_online: onlineSet.has(r.id)
+    }));
+    res.json(result);
+  });
+});
+
+// 받은 친구 요청 목록
+app.get('/api/friends/requests', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+  const sql = `
+    SELECT f.id as request_id, u.id, u.username, u.nickname, u.elo_rating, f.created_at
+    FROM friendships f
+    JOIN users u ON f.requester_id = u.id
+    WHERE f.addressee_id = ? AND f.status = 'pending'
+    ORDER BY f.created_at DESC
+  `;
+  db.all(sql, [req.session.userId], (err, rows) => {
+    if (err) return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+    res.json(rows);
+  });
+});
+
+// 보낸 친구 요청 목록
+app.get('/api/friends/sent', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+  const sql = `
+    SELECT f.id as request_id, u.id, u.username, u.nickname, f.created_at
+    FROM friendships f
+    JOIN users u ON f.addressee_id = u.id
+    WHERE f.requester_id = ? AND f.status = 'pending'
+    ORDER BY f.created_at DESC
+  `;
+  db.all(sql, [req.session.userId], (err, rows) => {
+    if (err) return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+    res.json(rows);
+  });
+});
+
+// 친구 요청 전송
+app.post('/api/friends/request', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+  const { targetUserId } = req.body;
+  if (!targetUserId) return res.status(400).json({ message: 'targetUserId가 필요합니다.' });
+  if (targetUserId === req.session.userId) return res.status(400).json({ message: '자기 자신에게 친구 요청을 보낼 수 없습니다.' });
+
+  // 이미 관계가 있는지 확인
+  db.get(
+    'SELECT * FROM friendships WHERE (requester_id=? AND addressee_id=?) OR (requester_id=? AND addressee_id=?)',
+    [req.session.userId, targetUserId, targetUserId, req.session.userId],
+    (err, existing) => {
+      if (err) return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+      if (existing) {
+        if (existing.status === 'accepted') return res.status(409).json({ message: '이미 친구입니다.' });
+        if (existing.status === 'pending') return res.status(409).json({ message: '이미 친구 요청이 존재합니다.' });
+      }
+      db.run(
+        'INSERT INTO friendships (requester_id, addressee_id, status) VALUES (?, ?, ?)',
+        [req.session.userId, targetUserId, 'pending'],
+        function(err2) {
+          if (err2) return res.status(500).json({ message: '친구 요청 전송 실패.' });
+          // 실시간 알림
+          const targetSocketId = [...(onlineUsers.get(targetUserId) || [])][0];
+          if (targetSocketId) {
+            io.to(targetSocketId).emit('friendRequestReceived', {
+              requestId: this.lastID,
+              fromUserId: req.session.userId,
+              fromNickname: req.session.nickname
+            });
+          }
+          res.json({ message: '친구 요청이 전송되었습니다.' });
+        }
+      );
+    }
+  );
+});
+
+// 친구 요청 응답 (수락/거절)
+app.post('/api/friends/respond', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+  const { requesterId, action } = req.body;
+  if (!requesterId || !['accept', 'reject'].includes(action)) {
+    return res.status(400).json({ message: '올바른 요청이 아닙니다.' });
+  }
+  const newStatus = action === 'accept' ? 'accepted' : 'rejected';
+  db.run(
+    'UPDATE friendships SET status=?, updated_at=CURRENT_TIMESTAMP WHERE requester_id=? AND addressee_id=? AND status=\'pending\'',
+    [newStatus, requesterId, req.session.userId],
+    function(err) {
+      if (err) return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+      if (this.changes === 0) return res.status(404).json({ message: '친구 요청을 찾을 수 없습니다.' });
+      // 실시간 알림 - 요청자에게 결과 전달
+      const requesterSocketId = [...(onlineUsers.get(parseInt(requesterId)) || [])][0];
+      if (requesterSocketId) {
+        io.to(requesterSocketId).emit('friendRequestResponded', {
+          addresseeId: req.session.userId,
+          addresseeNickname: req.session.nickname,
+          action
+        });
+      }
+      res.json({ message: action === 'accept' ? '친구 요청을 수락했습니다.' : '친구 요청을 거절했습니다.' });
+    }
+  );
+});
+
+// 친구 삭제
+app.delete('/api/friends/:friendId', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+  const friendId = parseInt(req.params.friendId);
+  db.run(
+    'DELETE FROM friendships WHERE ((requester_id=? AND addressee_id=?) OR (requester_id=? AND addressee_id=?)) AND status=\'accepted\'',
+    [req.session.userId, friendId, friendId, req.session.userId],
+    function(err) {
+      if (err) return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+      if (this.changes === 0) return res.status(404).json({ message: '친구 관계를 찾을 수 없습니다.' });
+      res.json({ message: '친구가 삭제되었습니다.' });
+    }
+  );
+});
+
+// 친구 간 전적 조회
+app.get('/api/friends/record/:friendId', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+  const friendId = parseInt(req.params.friendId);
+  const myId = req.session.userId;
+  const sql = `
+    SELECT
+      COUNT(*) as total,
+      SUM(CASE
+        WHEN (white_player_id=? AND winner='white') OR (black_player_id=? AND winner='black') THEN 1 ELSE 0
+      END) as my_wins,
+      SUM(CASE
+        WHEN (white_player_id=? AND winner='black') OR (black_player_id=? AND winner='white') THEN 1 ELSE 0
+      END) as my_losses,
+      SUM(CASE WHEN winner='draw' THEN 1 ELSE 0 END) as draws
+    FROM game_history
+    WHERE (white_player_id=? AND black_player_id=?) OR (white_player_id=? AND black_player_id=?)
+  `;
+  db.get(sql, [myId, myId, myId, myId, myId, friendId, friendId, myId], (err, row) => {
+    if (err) return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+    res.json(row || { total: 0, my_wins: 0, my_losses: 0, draws: 0 });
+  });
+});
+
 // 테마 설정 저장
 app.put('/api/settings', (req, res) => {
   if (!req.session.userId) {
@@ -296,6 +497,9 @@ app.put('/api/settings', (req, res) => {
   });
 });
 
+// 온라인 유저 추적: userId(number) -> Set<socketId>
+const onlineUsers = new Map();
+
 // 체스 게임 클래스
 class ChessGame {
   constructor() {
@@ -329,6 +533,77 @@ class ChessGame {
       socket.on('offerDraw', (data) => this.handleDrawOffer(socket, data));
       socket.on('respondDraw', (data) => this.handleDrawResponse(socket, data));
       socket.on('disconnect', () => this.handleDisconnect(socket));
+
+      // 친구 시스템 소켓 이벤트
+      socket.on('identify', (data) => this.handleIdentify(socket, data));
+      socket.on('sendGameInvite', (data) => this.handleGameInvite(socket, data));
+      socket.on('respondGameInvite', (data) => this.handleGameInviteResponse(socket, data));
+    });
+  }
+
+  handleIdentify(socket, data) {
+    const { userId, nickname } = data;
+    if (!userId) return;
+    socket.userId = userId;
+    socket.userNickname = nickname;
+    if (!onlineUsers.has(userId)) onlineUsers.set(userId, new Set());
+    onlineUsers.get(userId).add(socket.id);
+
+    // 친구들에게 온라인 상태 알림
+    this.notifyFriendsOnlineStatus(userId, true);
+  }
+
+  notifyFriendsOnlineStatus(userId, isOnline) {
+    const sql = `
+      SELECT CASE WHEN requester_id=? THEN addressee_id ELSE requester_id END as friend_id
+      FROM friendships
+      WHERE (requester_id=? OR addressee_id=?) AND status='accepted'
+    `;
+    const db = require('./server/database.js');
+    db.all(sql, [userId, userId, userId], (err, rows) => {
+      if (err) return;
+      rows.forEach(row => {
+        const friendSockets = onlineUsers.get(row.friend_id);
+        if (friendSockets) {
+          friendSockets.forEach(sid => {
+            io.to(sid).emit('friendOnlineStatus', { userId, isOnline });
+          });
+        }
+      });
+    });
+  }
+
+  handleGameInvite(socket, data) {
+    const { targetUserId, roomId } = data;
+    if (!socket.userId || !targetUserId) return;
+    const targetSockets = onlineUsers.get(targetUserId);
+    if (!targetSockets || targetSockets.size === 0) {
+      socket.emit('gameInviteError', { message: '상대방이 오프라인 상태입니다.' });
+      return;
+    }
+    const inviteId = `${socket.userId}_${Date.now()}`;
+    targetSockets.forEach(sid => {
+      io.to(sid).emit('gameInviteReceived', {
+        inviteId,
+        fromUserId: socket.userId,
+        fromNickname: socket.userNickname,
+        roomId
+      });
+    });
+  }
+
+  handleGameInviteResponse(socket, data) {
+    const { inviteId, fromUserId, action, roomId } = data;
+    const fromSockets = onlineUsers.get(fromUserId);
+    if (!fromSockets) return;
+    fromSockets.forEach(sid => {
+      io.to(sid).emit('gameInviteResponse', {
+        inviteId,
+        fromUserId: socket.userId,
+        fromNickname: socket.userNickname,
+        action,
+        roomId
+      });
     });
   }
 
@@ -979,6 +1254,17 @@ class ChessGame {
       if (this.spectators[roomId][socket.id]) {
         this.handleLeaveSpectate(socket, roomId);
         break;
+      }
+    }
+    // 온라인 유저 맵에서 제거
+    if (socket.userId) {
+      const sockets = onlineUsers.get(socket.userId);
+      if (sockets) {
+        sockets.delete(socket.id);
+        if (sockets.size === 0) {
+          onlineUsers.delete(socket.userId);
+          this.notifyFriendsOnlineStatus(socket.userId, false);
+        }
       }
     }
   }
