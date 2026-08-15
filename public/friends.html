@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>친구 - NAK 체스 게임</title>
+  <meta name="description" content="NAK 체스 친구 시스템 - 친구를 추가하고 게임에 초대하세요.">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="main.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* 친구 페이지 전용 스타일 */
+    .friends-page {
+      padding: 2rem 0 4rem;
+    }
+    .friends-layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .friends-layout { grid-template-columns: 1fr; }
+    }
+
+    /* 패널 공통 */
+    .friends-panel {
+      background: var(--card-bg, #fff);
+      border: 1px solid var(--border-color, #e2e8f0);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border-color, #e2e8f0);
+      background: var(--panel-header-bg, #f8fafc);
+    }
+    .panel-header h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .panel-body { padding: 1rem 1.25rem; }
+
+    /* 검색 */
+    .search-box {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .search-box input {
+      flex: 1;
+      padding: 0.6rem 0.9rem;
+      border: 1px solid var(--border-color, #e2e8f0);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      background: var(--input-bg, #fff);
+      color: var(--text-color, #1a202c);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-box input:focus { border-color: var(--primary-color, #6366f1); }
+    .search-box button {
+      padding: 0.6rem 1rem;
+      border: none;
+      border-radius: 8px;
+      background: var(--primary-color, #6366f1);
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: opacity 0.2s;
+    }
+    .search-box button:hover { opacity: 0.85; }
+
+    /* 유저 카드 */
+    .user-card {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border-color, #e2e8f0);
+    }
+    .user-card:last-child { border-bottom: none; }
+    .user-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--primary-color, #6366f1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .online-dot {
+      position: absolute;
+      bottom: 1px;
+      right: 1px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #22c55e;
+      border: 2px solid var(--card-bg, #fff);
+    }
+    .offline-dot {
+      position: absolute;
+      bottom: 1px;
+      right: 1px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #94a3b8;
+      border: 2px solid var(--card-bg, #fff);
+    }
+    .user-info { flex: 1; min-width: 0; }
+    .user-nickname {
+      font-weight: 600;
+      font-size: 0.95rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .user-meta {
+      font-size: 0.78rem;
+      color: var(--text-muted, #64748b);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 2px;
+    }
+    .online-label { color: #22c55e; font-weight: 500; }
+    .offline-label { color: #94a3b8; }
+
+    /* 액션 버튼 */
+    .card-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+    .btn-icon {
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      transition: background 0.15s;
+    }
+    .btn-icon.accept { background: #dcfce7; color: #16a34a; }
+    .btn-icon.accept:hover { background: #bbf7d0; }
+    .btn-icon.reject { background: #fee2e2; color: #dc2626; }
+    .btn-icon.reject:hover { background: #fecaca; }
+    .btn-icon.invite { background: #e0e7ff; color: #4338ca; }
+    .btn-icon.invite:hover { background: #c7d2fe; }
+    .btn-icon.remove { background: #f1f5f9; color: #64748b; }
+    .btn-icon.remove:hover { background: #e2e8f0; }
+    .btn-add {
+      padding: 0.35rem 0.75rem;
+      border: none;
+      border-radius: 8px;
+      background: var(--primary-color, #6366f1);
+      color: #fff;
+      font-size: 0.82rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.15s;
+    }
+    .btn-add:hover { opacity: 0.85; }
+    .btn-add:disabled { opacity: 0.45; cursor: default; }
+
+    /* 탭 */
+    .friends-tabs {
+      display: flex;
+      gap: 0.25rem;
+      padding: 0.75rem 1.25rem 0;
+      border-bottom: 1px solid var(--border-color, #e2e8f0);
+      background: var(--panel-header-bg, #f8fafc);
+    }
+    .tab-btn {
+      padding: 0.45rem 0.9rem;
+      border: none;
+      border-radius: 8px 8px 0 0;
+      background: transparent;
+      color: var(--text-muted, #64748b);
+      font-size: 0.88rem;
+      cursor: pointer;
+      font-weight: 500;
+      position: relative;
+      transition: color 0.15s;
+    }
+    .tab-btn.active {
+      color: var(--primary-color, #6366f1);
+      background: var(--card-bg, #fff);
+    }
+    .tab-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      background: #ef4444;
+      color: #fff;
+      border-radius: 9px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      margin-left: 5px;
+    }
+
+    /* 전적 패널 */
+    .record-panel { padding: 1.25rem; }
+    .record-select { margin-bottom: 1rem; }
+    .record-select select {
+      width: 100%;
+      padding: 0.55rem 0.9rem;
+      border: 1px solid var(--border-color, #e2e8f0);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      background: var(--input-bg, #fff);
+      color: var(--text-color, #1a202c);
+      outline: none;
+    }
+    .record-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+      text-align: center;
+    }
+    .record-stat {
+      padding: 0.75rem 0.5rem;
+      border-radius: 10px;
+      background: var(--panel-header-bg, #f8fafc);
+    }
+    .record-stat .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+    .record-stat .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted, #64748b);
+      margin-top: 2px;
+    }
+    .record-stat.wins .stat-value { color: #16a34a; }
+    .record-stat.losses .stat-value { color: #dc2626; }
+    .record-stat.draws .stat-value { color: #d97706; }
+    .record-no-friend {
+      text-align: center;
+      color: var(--text-muted, #64748b);
+      padding: 1.5rem 0;
+      font-size: 0.9rem;
+    }
+
+    /* 초대 모달 */
+    .invite-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .invite-modal {
+      background: var(--card-bg, #fff);
+      border-radius: 14px;
+      padding: 1.75rem;
+      max-width: 380px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .invite-modal h3 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+    .invite-modal p { color: var(--text-muted, #64748b); font-size: 0.9rem; margin: 0 0 1.25rem; }
+    .invite-modal-actions { display: flex; gap: 0.75rem; justify-content: center; }
+    .invite-modal-actions button {
+      padding: 0.6rem 1.4rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: opacity 0.15s;
+    }
+    .invite-modal-actions button:hover { opacity: 0.85; }
+    .btn-accept-invite { background: #22c55e; color: #fff; }
+    .btn-reject-invite { background: #f1f5f9; color: #475569; }
+
+    /* 빈 상태 */
+    .empty-state {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--text-muted, #64748b);
+      font-size: 0.9rem;
+    }
+    .empty-state i { font-size: 2.5rem; margin-bottom: 0.75rem; display: block; opacity: 0.4; }
+
+    /* 알림 토스트 */
+    #friend-toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: #1e293b;
+      color: #fff;
+      padding: 0.8rem 1.25rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      z-index: 99999;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+      display: none;
+      animation: slideIn 0.25s ease;
+    }
+    @keyframes slideIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content">메인 컨텐츠로 이동</a>
+
+  <header id="header" class="header" role="banner">
+    <div class="container">
+      <div class="logo">
+        <h1><a href="index.html" style="text-decoration: none; color: inherit;"><i class="fas fa-chess-king" aria-hidden="true"></i> NAK 체스</a></h1>
+      </div>
+      <nav class="nav" role="navigation" aria-label="메인 네비게이션">
+        <ul class="nav-list" id="nav-list">
+          <li><a href="index.html" class="nav-link">홈</a></li>
+          <li><a href="features.html" class="nav-link">기능</a></li>
+          <li><a href="how-to-play.html" class="nav-link">게임 방법</a></li>
+          <li><a href="chess-rules.html" class="nav-link">체스 규칙</a></li>
+          <li><a href="leaderboard.html" class="nav-link">리더보드</a></li>
+          <li><a href="stats.html" class="nav-link">통계</a></li>
+          <li><a href="friends.html" class="nav-link active">친구</a></li>
+        </ul>
+      </nav>
+      <div class="header-actions">
+        <button id="dark-mode-toggle" class="icon-btn" aria-label="다크모드 전환" title="다크모드 전환">
+          <i class="fas fa-moon"></i>
+        </button>
+        <div id="auth-links" class="auth-links">
+          <a href="login.html" class="btn btn-sm btn-outline">로그인</a>
+          <a href="game.html" class="btn btn-sm btn-primary">게임 시작</a>
+        </div>
+      </div>
+      <div class="mobile-nav-toggle" id="mobile-nav-toggle" aria-label="모바일 메뉴 토글">
+        <i class="fas fa-bars"></i>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <section class="page-hero">
+      <div class="container">
+        <div class="page-hero-content reveal">
+          <h1><i class="fas fa-user-friends"></i> 친구</h1>
+          <p>친구를 추가하고 함께 체스를 즐기세요</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="friends-page">
+      <div class="container">
+        <div class="friends-layout">
+
+          <!-- 왼쪽: 검색 + 친구/요청 목록 -->
+          <div>
+            <!-- 유저 검색 -->
+            <div class="friends-panel" style="margin-bottom:1.25rem;">
+              <div class="panel-header">
+                <h3><i class="fas fa-search"></i> 유저 검색</h3>
+              </div>
+              <div class="panel-body">
+                <div class="search-box">
+                  <input type="text" id="search-input" placeholder="닉네임 또는 아이디 검색..." autocomplete="off">
+                  <button id="search-btn"><i class="fas fa-search"></i></button>
+                </div>
+                <div id="search-results"></div>
+              </div>
+            </div>
+
+            <!-- 친구 목록 / 요청 탭 -->
+            <div class="friends-panel">
+              <div class="friends-tabs">
+                <button class="tab-btn active" data-tab="friends">
+                  <i class="fas fa-user-friends"></i> 친구
+                </button>
+                <button class="tab-btn" data-tab="requests">
+                  <i class="fas fa-bell"></i> 받은 요청
+                  <span class="tab-badge" id="request-badge" style="display:none;">0</span>
+                </button>
+                <button class="tab-btn" data-tab="sent">
+                  <i class="fas fa-paper-plane"></i> 보낸 요청
+                </button>
+              </div>
+
+              <!-- 친구 목록 탭 -->
+              <div id="tab-friends" class="panel-body" style="min-height:120px;">
+                <div id="friends-list"></div>
+              </div>
+
+              <!-- 받은 요청 탭 -->
+              <div id="tab-requests" class="panel-body" style="display:none; min-height:120px;">
+                <div id="requests-list"></div>
+              </div>
+
+              <!-- 보낸 요청 탭 -->
+              <div id="tab-sent" class="panel-body" style="display:none; min-height:120px;">
+                <div id="sent-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 오른쪽: 친구 간 전적 -->
+          <div class="friends-panel">
+            <div class="panel-header">
+              <h3><i class="fas fa-chart-bar"></i> 친구 간 전적</h3>
+            </div>
+            <div class="record-panel">
+              <div class="record-select">
+                <select id="record-friend-select">
+                  <option value="">친구를 선택하세요</option>
+                </select>
+              </div>
+              <div id="record-content">
+                <div class="record-no-friend">친구를 선택하면 상대 전적을 확인할 수 있습니다.</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 게임 초대 모달 -->
+  <div id="invite-modal" class="invite-modal-overlay" style="display:none;">
+    <div class="invite-modal">
+      <h3><i class="fas fa-chess"></i> 게임 초대</h3>
+      <p id="invite-modal-text">상대방이 게임에 초대했습니다.</p>
+      <div class="invite-modal-actions">
+        <button class="btn-accept-invite" id="accept-invite-btn"><i class="fas fa-check"></i> 수락</button>
+        <button class="btn-reject-invite" id="reject-invite-btn"><i class="fas fa-times"></i> 거절</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 토스트 알림 -->
+  <div id="friend-toast"></div>
+
+  <!-- Socket.IO -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/friends.js"></script>
+</body>
+</html>
