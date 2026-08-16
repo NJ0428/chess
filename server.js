@@ -559,7 +559,6 @@ class ChessGame {
       FROM friendships
       WHERE (requester_id=? OR addressee_id=?) AND status='accepted'
     `;
-    const db = require('./server/database.js');
     db.all(sql, [userId, userId, userId], (err, rows) => {
       if (err) return;
       rows.forEach(row => {
