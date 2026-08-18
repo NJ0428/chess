@@ -1248,6 +1248,16 @@ class EventManager {
       UIManager.showNotification('AI 대전 시작! 당신은 백 (선공)입니다.');
     });
 
+    // 토너먼트 경기 입장
+    socket.on('tournamentRoomJoined', (data) => {
+      gameState.currentRoom = data.roomId;
+      gameState.playerColor = data.color;
+      gameState.isTournamentMatch = true;
+      UIManager.showScreen('gameSetup');
+      if (elements.roomInfo) elements.roomInfo.textContent = `토너먼트 경기 | 방: ${data.roomId}`;
+      UIManager.showNotification(`토너먼트 경기 대기 중 — ${data.opponentName}와(과)의 경기`);
+    });
+
     socket.on('roomCreated', (data) => {
       gameState.currentRoom = data.roomId;
       gameState.playerColor = data.color;
@@ -2915,11 +2925,29 @@ function debugGameState() {
   console.log('=====================');
 }
 
+// 토너먼트 경기 URL 파라미터 처리 (identify 후 호출)
+function handleTournamentParams() {
+  const params = new URLSearchParams(window.location.search);
+  const matchId = params.get('tournamentMatchId');
+  const roomId = params.get('roomId');
+  if (matchId && roomId) {
+    // identify 이후에 경기 입장 이벤트 발송
+    socket.emit('joinTournamentMatch', { matchId: Number(matchId), roomId });
+  }
+}
+
 // 초기화
 function init() {
   console.log('게임 초기화 시작');
 
-  initializeUser();
+  // tournament 파라미터가 있으면 identify 완료 후 처리
+  const params = new URLSearchParams(window.location.search);
+  const isTournamentEntry = !!params.get('tournamentMatchId');
+
+  initializeUser().then(() => {
+    // identify가 initializeUser 내부에서 emit됨 → 이후 입장
+    if (isTournamentEntry) handleTournamentParams();
+  }).catch(() => {});
 
   const audioManager = new AudioManager();
 
@@ -2929,6 +2957,9 @@ function init() {
   AnalysisManager.initEvents();
   setupNavigation();
   ThemeManager.load(); // 설정 로드 (비동기, 완료 시 자동 적용)
+
+  // 토너먼트 경기 URL 파라미터 처리
+  handleTournamentParams();
 
   // 초기 UI 업데이트
   UIManager.updateGameInfo();
@@ -2972,8 +3003,12 @@ async function initializeUser() {
 
     if (authData.isLoggedIn) {
       gameState.playerName = authData.user.nickname;
+      gameState.userId = authData.user.id;
       elements.playerNameInput.value = authData.user.nickname;
       elements.playerNameInput.readOnly = true;
+
+      // 소켓에 사용자 식별 등록 (토너먼트 및 친구 기능용)
+      socket.emit('identify', { userId: authData.user.id, nickname: authData.user.nickname });
 
       // 관전자 이름도 기본값으로 설정
       if (elements.spectatorNameInput) {
