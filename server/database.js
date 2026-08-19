@@ -158,6 +158,85 @@ function initializeDatabase() {
       console.log('friendships 테이블이 성공적으로 생성되었거나 이미 존재합니다.');
     }
   });
+
+  const tournamentsTable = `
+    CREATE TABLE IF NOT EXISTS tournaments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      host_id INTEGER NOT NULL,
+      host_username TEXT NOT NULL,
+      host_nickname TEXT NOT NULL,
+      format TEXT NOT NULL DEFAULT 'single_elimination',
+      max_players INTEGER NOT NULL DEFAULT 8,
+      time_control TEXT NOT NULL DEFAULT 'blitz',
+      status TEXT NOT NULL DEFAULT 'waiting',
+      current_round INTEGER DEFAULT 0,
+      total_rounds INTEGER DEFAULT 0,
+      winner_id INTEGER,
+      winner_nickname TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      started_at DATETIME,
+      ended_at DATETIME,
+      FOREIGN KEY (host_id) REFERENCES users (id)
+    )
+  `;
+
+  const tournamentParticipantsTable = `
+    CREATE TABLE IF NOT EXISTS tournament_participants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tournament_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      username TEXT NOT NULL,
+      nickname TEXT NOT NULL,
+      elo_rating INTEGER DEFAULT 1200,
+      seed INTEGER DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      points REAL DEFAULT 0,
+      wins INTEGER DEFAULT 0,
+      losses INTEGER DEFAULT 0,
+      draws INTEGER DEFAULT 0,
+      buchholz REAL DEFAULT 0,
+      joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(tournament_id, user_id),
+      FOREIGN KEY (tournament_id) REFERENCES tournaments (id),
+      FOREIGN KEY (user_id) REFERENCES users (id)
+    )
+  `;
+
+  const tournamentMatchesTable = `
+    CREATE TABLE IF NOT EXISTS tournament_matches (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tournament_id INTEGER NOT NULL,
+      round INTEGER NOT NULL,
+      match_index INTEGER NOT NULL,
+      white_player_id INTEGER,
+      black_player_id INTEGER,
+      white_nickname TEXT,
+      black_nickname TEXT,
+      winner_id INTEGER,
+      result TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      room_id TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      ended_at DATETIME,
+      FOREIGN KEY (tournament_id) REFERENCES tournaments (id)
+    )
+  `;
+
+  db.run(tournamentsTable, (err) => {
+    if (err) console.error('tournaments 테이블 생성 실패:', err);
+    else console.log('tournaments 테이블이 성공적으로 생성되었거나 이미 존재합니다.');
+  });
+
+  db.run(tournamentParticipantsTable, (err) => {
+    if (err) console.error('tournament_participants 테이블 생성 실패:', err);
+    else console.log('tournament_participants 테이블이 성공적으로 생성되었거나 이미 존재합니다.');
+  });
+
+  db.run(tournamentMatchesTable, (err) => {
+    if (err) console.error('tournament_matches 테이블 생성 실패:', err);
+    else console.log('tournament_matches 테이블이 성공적으로 생성되었거나 이미 존재합니다.');
+  });
 }
 
 // 기존 users 테이블에 새 컬럼 추가
