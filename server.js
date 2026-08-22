@@ -7,6 +7,7 @@ const SQLiteStore = require('connect-sqlite3')(session);
 const bcrypt = require('bcrypt');
 const db = require('./server/database.js'); // 데이터베이스 설정 가져오기
 const { EloRatingSystem, GameStatsManager } = require('./server/gameStats.js');
+const tournamentManager = require('./server/tournament.js');
 const initStockfish = require('stockfish');
 
 const app = express();
@@ -497,6 +498,84 @@ app.put('/api/settings', (req, res) => {
   });
 });
 
+// ─── 토너먼트 REST API ──────────────────────────────────────────────
+
+// 토너먼트 목록 조회
+app.get('/api/tournaments', (req, res) => {
+  const { status } = req.query;
+  tournamentManager.getList(status || null, (err, list) => {
+    if (err) return res.status(500).json({ message: '서버 오류' });
+    res.json(list);
+  });
+});
+
+// 토너먼트 상세 조회
+app.get('/api/tournaments/:id', (req, res) => {
+  tournamentManager.getDetails(Number(req.params.id), (err, data) => {
+    if (err) return res.status(500).json({ message: '서버 오류' });
+    if (!data) return res.status(404).json({ message: '토너먼트를 찾을 수 없습니다.' });
+    res.json(data);
+  });
+});
+
+// 토너먼트 생성
+app.post('/api/tournaments', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ message: '로그인이 필요합니다.' });
+  const { name, format, maxPlayers, timeControl } = req.body;
+  tournamentManager.create(
+    req.session.userId, req.session.username, req.session.nickname,
+    { name, format, maxPlayers: Number(maxPlayers), timeControl },
+    (err, tournamentId) => {
+      if (err) return res.status(400).json({ message: err.message });
+      res.status(201).json({ message: '토너먼트가 생성되었습니다.', tournamentId });
+    }
+  );
+});
+
+// 토너먼트 참가
+app.post('/api/tournaments/:id/join', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ message: '로그인이 필요합니다.' });
+  tournamentManager.join(
+    Number(req.params.id),
+    req.session.userId, req.session.username, req.session.nickname,
+    (err) => {
+      if (err) return res.status(400).json({ message: err.message });
+      res.json({ message: '참가가 완료되었습니다.' });
+    }
+  );
+});
+
+// 토너먼트 참가 취소
+app.post('/api/tournaments/:id/leave', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ message: '로그인이 필요합니다.' });
+  tournamentManager.leave(Number(req.params.id), req.session.userId, (err) => {
+    if (err) return res.status(400).json({ message: err.message });
+    res.json({ message: '참가가 취소되었습니다.' });
+  });
+});
+
+// 토너먼트 삭제 (방장)
+app.delete('/api/tournaments/:id', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ message: '로그인이 필요합니다.' });
+  tournamentManager.deleteTournament(Number(req.params.id), req.session.userId, (err) => {
+    if (err) return res.status(400).json({ message: err.message });
+    res.json({ message: '토너먼트가 삭제되었습니다.' });
+  });
+});
+
+// 토너먼트 시작 (방장)
+app.post('/api/tournaments/:id/start', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ message: '로그인이 필요합니다.' });
+  const tournamentId = Number(req.params.id);
+  tournamentManager.start(tournamentId, req.session.userId, (err, matches) => {
+    if (err) return res.status(400).json({ message: err.message });
+
+    // 토너먼트 참가자들에게 소켓 알림 및 방 생성
+    chessGame.createTournamentRooms(tournamentId, matches);
+    res.json({ message: '토너먼트가 시작되었습니다.', matches });
+  });
+});
+
 // 온라인 유저 추적: userId(number) -> Set<socketId>
 const onlineUsers = new Map();
 
@@ -538,6 +617,9 @@ class ChessGame {
       socket.on('identify', (data) => this.handleIdentify(socket, data));
       socket.on('sendGameInvite', (data) => this.handleGameInvite(socket, data));
       socket.on('respondGameInvite', (data) => this.handleGameInviteResponse(socket, data));
+
+      // 토너먼트 소켓 이벤트
+      socket.on('joinTournamentMatch', (data) => this.handleJoinTournamentMatch(socket, data));
     });
   }
 
@@ -570,6 +652,163 @@ class ChessGame {
         }
       });
     });
+  }
+
+  // ─── 토너먼트 방 생성 및 알림 ──────────────────────────────────
+  createTournamentRooms(tournamentId, matches) {
+    if (!matches || matches.length === 0) return;
+    const tcMap = { blitz: 180, rapid: 600, classic: 1800 };
+
+    for (const match of matches) {
+      if (match.isBye || !match.roomId) continue;
+
+      const roomId = match.roomId;
+      const seconds = match.timeSeconds || 180;
+
+      // 방 미리 생성 (빈 방, 두 플레이어 모두 대기)
+      this.games[roomId] = {
+        board: null, // ChessRules.initializeBoard() 호출 후 설정
+        players: { white: null, black: null },
+        playerNames: { white: match.white ? match.white.nickname : '', black: match.black ? match.black.nickname : '' },
+        playerUserIds: { white: match.white ? match.white.user_id : null, black: match.black ? match.black.user_id : null },
+        currentTurn: 'white',
+        status: 'tournament_waiting',
+        tournamentMatchId: match.id,
+        tournamentId,
+        moveHistory: [],
+        boardHistory: [],
+        chatHistory: [],
+        spectatorChatHistory: [],
+        castlingRights: { white: { kingSide: true, queenSide: true }, black: { kingSide: true, queenSide: true } },
+        castlingRightsHistory: [],
+        hintUsage: { white: 0, black: 0 },
+        hintMoveNums: [],
+        takebackUsage: { white: 0, black: 0 },
+        pendingTakeback: null,
+        pendingDraw: null,
+        timeControl: { enabled: true, initial: seconds },
+        timers: { white: seconds, black: seconds },
+        timerInterval: null,
+        lastMoveTime: null,
+        createdAt: new Date().toISOString(),
+        creatorName: match.white ? match.white.nickname : ''
+      };
+
+      // ChessRules.initializeBoard() 호출하여 board 초기화
+      this.games[roomId].board = ChessRules.initializeBoard();
+      this.games[roomId].boardHistory = [JSON.parse(JSON.stringify(this.games[roomId].board))];
+      this.games[roomId].castlingRightsHistory = [JSON.parse(JSON.stringify(this.games[roomId].castlingRights))];
+
+      // 토너먼트 DB에서 match_id 업데이트
+      db.run('UPDATE tournament_matches SET status=? WHERE id=?', ['pending', match.id]);
+
+      // 두 플레이어에게 알림
+      const notifyPlayer = (userId, color, opponentNickname) => {
+        if (!userId) return;
+        const sockets = onlineUsers.get(userId);
+        if (sockets) {
+          sockets.forEach(sid => {
+            io.to(sid).emit('tournamentMatchReady', {
+              matchId: match.id,
+              roomId,
+              color,
+              opponentName: opponentNickname,
+              timeSeconds: seconds,
+              tournamentId
+            });
+          });
+        }
+      };
+
+      notifyPlayer(
+        match.white ? match.white.user_id : null,
+        'white',
+        match.black ? match.black.nickname : ''
+      );
+      notifyPlayer(
+        match.black ? match.black.user_id : null,
+        'black',
+        match.white ? match.white.nickname : ''
+      );
+    }
+
+    // 토너먼트 구독자 전체에게 업데이트 알림
+    io.emit('tournamentUpdated', { tournamentId });
+  }
+
+  handleJoinTournamentMatch(socket, data) {
+    const { matchId, roomId } = data;
+    if (!socket.userId) return socket.emit('error', '로그인이 필요합니다.');
+
+    const room = this.games[roomId];
+    if (!room || room.status === 'finished') {
+      return socket.emit('error', '경기 방을 찾을 수 없습니다.');
+    }
+
+    const isWhite = room.playerUserIds.white === socket.userId;
+    const isBlack = room.playerUserIds.black === socket.userId;
+
+    if (!isWhite && !isBlack) {
+      return socket.emit('error', '이 경기의 참가자가 아닙니다.');
+    }
+
+    const color = isWhite ? 'white' : 'black';
+
+    if (room.players[color] === socket.id) return; // 이미 참가함
+
+    socket.join(roomId);
+    room.players[color] = socket.id;
+    socket.emit('tournamentRoomJoined', {
+      roomId, color,
+      board: room.board,
+      opponentName: color === 'white' ? room.playerNames.black : room.playerNames.white,
+      timeControl: room.timeControl,
+      timers: room.timers
+    });
+
+    // 양쪽 다 입장했으면 게임 시작
+    if (room.players.white && room.players.black && room.status === 'tournament_waiting') {
+      room.status = 'playing';
+      db.run('UPDATE tournament_matches SET status=? WHERE id=?', ['ongoing', matchId]);
+
+      setTimeout(async () => {
+        io.to(roomId).emit('gameStart', {
+          board: room.board,
+          turn: room.currentTurn,
+          whitePlayer: room.playerNames.white,
+          blackPlayer: room.playerNames.black,
+          timeControl: room.timeControl,
+          timers: room.timers,
+          isTournamentMatch: true,
+          matchId
+        });
+
+        this.startPlayerTimer(roomId);
+
+        // 게임 통계 기록 시작
+        try {
+          const getPlayerIds = `SELECT id FROM users WHERE id IN (?, ?)`;
+          db.all(getPlayerIds, [room.playerUserIds.white, room.playerUserIds.black], async (err, players) => {
+            if (!err && players.length === 2) {
+              const gameId = await GameStatsManager.recordGameStart(
+                roomId, room.playerUserIds.white, room.playerUserIds.black,
+                room.playerNames.white, room.playerNames.black
+              );
+              this.gameStats[roomId] = {
+                gameId,
+                whitePlayerId: room.playerUserIds.white,
+                blackPlayerId: room.playerUserIds.black,
+                startTime: Date.now(),
+                moveCount: 0,
+                moves: []
+              };
+            }
+          });
+        } catch (e) {
+          console.error('토너먼트 게임 통계 기록 실패:', e);
+        }
+      }, 1000);
+    }
   }
 
   handleGameInvite(socket, data) {
@@ -1627,6 +1866,48 @@ class ChessGame {
         roomId, winner, resultType,
         gameStats.moveCount, gameDuration, movesPgn
       );
+
+      // 토너먼트 경기인 경우 결과 보고
+      const room = this.games[roomId];
+      if (room && room.tournamentMatchId) {
+        const matchId = room.tournamentMatchId;
+        const tournamentId = room.tournamentId;
+        let winnerId = null;
+        if (winner === 'white') winnerId = room.playerUserIds ? room.playerUserIds.white : null;
+        else if (winner === 'black') winnerId = room.playerUserIds ? room.playerUserIds.black : null;
+
+        tournamentManager.reportResult(matchId, winnerId, winner, (err, state) => {
+          if (err) { console.error('토너먼트 결과 보고 오류:', err); return; }
+          io.emit('tournamentUpdated', { tournamentId });
+
+          if (state && state.roundComplete) {
+            // 새 라운드 방 생성
+            if (state.matches) {
+              this.createTournamentRooms(tournamentId, state.matches);
+            }
+            io.emit('tournamentNewRound', { tournamentId, round: state.newRound });
+          }
+          if (state && state.tournamentComplete) {
+            io.emit('tournamentFinished', {
+              tournamentId,
+              winner: state.winner,
+              standings: state.standings
+            });
+            // 우승자에게 업적 알림
+            if (state.winner) {
+              const winnerSockets = onlineUsers.get(state.winner.user_id);
+              if (winnerSockets) {
+                winnerSockets.forEach(sid => {
+                  io.to(sid).emit('achievementsEarned', [{
+                    achievement_name: '🏆 토너먼트 우승',
+                    description: '토너먼트에서 우승했습니다! (ELO +50)'
+                  }]);
+                });
+              }
+            }
+          }
+        });
+      }
       if (gameStats.whitePlayerId) {
         const achievements = await GameStatsManager.checkAndAwardAchievements(gameStats.whitePlayerId);
         if (achievements.length > 0) {
