@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>토너먼트 - NAK 체스 게임</title>
+  <meta name="description" content="NAK 체스 토너먼트 - 다른 플레이어들과 토너먼트를 진행하세요.">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="main.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* ─── 페이지 레이아웃 ─────────────────────────────────────── */
+    .tournament-page { padding: 2rem 0 5rem; }
+    .tournament-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    @media (max-width: 900px) { .tournament-layout { grid-template-columns: 1fr; } }
+
+    /* ─── 패널 공통 ───────────────────────────────────────────── */
+    .t-panel {
+      background: var(--card-bg, #fff);
+      border: 1px solid var(--border-color, #e2e8f0);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .t-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border-color, #e2e8f0);
+      background: var(--panel-header-bg, #f8fafc);
+    }
+    .t-panel-header h3 {
+      font-size: 1rem; font-weight: 600; margin: 0;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .t-panel-body { padding: 1rem 1.25rem; }
+
+    /* ─── 탭 ──────────────────────────────────────────────────── */
+    .t-tabs { display: flex; gap: 0.25rem; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border-color, #e2e8f0); }
+    .t-tab {
+      padding: 0.4rem 0.9rem; border-radius: 20px; border: none; cursor: pointer;
+      font-size: 0.82rem; font-weight: 500; background: transparent;
+      color: var(--text-muted, #64748b); transition: all 0.2s;
+    }
+    .t-tab.active { background: #3b82f6; color: #fff; }
+
+    /* ─── 토너먼트 카드 ───────────────────────────────────────── */
+    .tournament-list { display: flex; flex-direction: column; gap: 0.6rem; }
+    .tournament-card {
+      padding: 0.85rem 1rem; border: 1px solid var(--border-color, #e2e8f0);
+      border-radius: 10px; cursor: pointer; transition: all 0.2s;
+      background: var(--card-bg, #fff);
+    }
+    .tournament-card:hover { border-color: #3b82f6; background: #eff6ff; }
+    .tournament-card.selected { border-color: #3b82f6; background: #eff6ff; box-shadow: 0 0 0 2px #93c5fd; }
+    .tc-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .tc-name { font-weight: 600; font-size: 0.95rem; }
+    .tc-status {
+      font-size: 0.7rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 20px;
+    }
+    .tc-status.waiting { background: #fef3c7; color: #92400e; }
+    .tc-status.ongoing { background: #d1fae5; color: #065f46; }
+    .tc-status.finished { background: #f1f5f9; color: #475569; }
+    .tc-meta { display: flex; gap: 1rem; margin-top: 0.4rem; font-size: 0.78rem; color: var(--text-muted, #64748b); }
+    .tc-meta span { display: flex; align-items: center; gap: 0.3rem; }
+
+    /* ─── 토너먼트 상세 ───────────────────────────────────────── */
+    .detail-header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+      color: #fff; padding: 1.5rem; border-radius: 12px 12px 0 0;
+    }
+    .detail-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .detail-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+    .detail-badge {
+      background: rgba(255,255,255,0.18); border-radius: 20px;
+      padding: 0.25rem 0.7rem; font-size: 0.8rem; font-weight: 500;
+    }
+    .detail-actions { margin-top: 1rem; display: flex; gap: 0.6rem; flex-wrap: wrap; }
+    .detail-actions .btn { font-size: 0.85rem; padding: 0.5rem 1.1rem; }
+
+    /* ─── 대진표 ──────────────────────────────────────────────── */
+    .bracket-section { padding: 1.25rem; }
+    .round-label { font-size: 0.75rem; font-weight: 700; color: #3b82f6; text-transform: uppercase; margin-bottom: 0.6rem; letter-spacing: 0.05em; }
+    .match-card {
+      border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px;
+      overflow: hidden; margin-bottom: 0.6rem; background: var(--card-bg, #fff);
+    }
+    .match-player {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.5rem 0.8rem; gap: 0.5rem;
+    }
+    .match-player + .match-player { border-top: 1px solid var(--border-color, #e2e8f0); }
+    .match-player.winner { background: #f0fdf4; }
+    .match-player.loser { background: #fef2f2; opacity: 0.8; }
+    .mp-name { font-size: 0.88rem; font-weight: 500; display: flex; align-items: center; gap: 0.4rem; }
+    .mp-pts { font-size: 0.8rem; font-weight: 700; color: #1d4ed8; }
+    .match-status-badge {
+      display: inline-block; font-size: 0.68rem; font-weight: 600; padding: 0.15rem 0.4rem;
+      border-radius: 4px; margin-left: auto;
+    }
+    .ms-pending { background: #fef3c7; color: #92400e; }
+    .ms-ongoing { background: #d1fae5; color: #065f46; }
+    .ms-finished { background: #e0f2fe; color: #075985; }
+    .ms-bye { background: #f1f5f9; color: #475569; }
+    .match-join-btn {
+      display: block; text-align: center; font-size: 0.78rem; font-weight: 600;
+      padding: 0.35rem; background: #3b82f6; color: #fff; border: none; cursor: pointer;
+      width: 100%; transition: background 0.2s;
+    }
+    .match-join-btn:hover { background: #2563eb; }
+
+    /* ─── 순위표 ──────────────────────────────────────────────── */
+    .standings-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .standings-table th {
+      text-align: left; font-weight: 600; font-size: 0.75rem; color: var(--text-muted, #64748b);
+      padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-color, #e2e8f0);
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .standings-table td { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border-color, #f1f5f9); }
+    .standings-table tr:last-child td { border-bottom: none; }
+    .rank-badge {
+      width: 24px; height: 24px; border-radius: 50%; display: inline-flex;
+      align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700;
+    }
+    .rank-1 { background: #fef3c7; color: #92400e; }
+    .rank-2 { background: #e2e8f0; color: #334155; }
+    .rank-3 { background: #fde8cc; color: #7c3f0f; }
+    .rank-other { background: #f1f5f9; color: #475569; }
+    .player-row-me td { background: #eff6ff; }
+
+    /* ─── 모달 ────────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      z-index: 10000; display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--card-bg, #fff); border-radius: 14px; width: 90%; max-width: 460px;
+      padding: 1.75rem; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      transform: translateY(20px); transition: transform 0.25s;
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal h3 { font-size: 1.2rem; font-weight: 700; margin: 0 0 1.25rem; }
+    .form-row { margin-bottom: 1rem; }
+    .form-row label { display: block; font-size: 0.83rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--text-muted, #64748b); }
+    .form-row input, .form-row select {
+      width: 100%; padding: 0.6rem 0.85rem; border: 1px solid var(--border-color, #e2e8f0);
+      border-radius: 8px; font-size: 0.9rem; background: var(--input-bg, #fff);
+      color: var(--text-primary, #1e293b); box-sizing: border-box;
+    }
+    .form-row input:focus, .form-row select:focus { outline: none; border-color: #3b82f6; }
+    .modal-actions { display: flex; gap: 0.6rem; justify-content: flex-end; margin-top: 1.25rem; }
+
+    /* ─── 토스트 ──────────────────────────────────────────────── */
+    #t-toast {
+      position: fixed; bottom: 2rem; right: 2rem;
+      background: #1e293b; color: #fff; padding: 0.8rem 1.25rem;
+      border-radius: 10px; font-size: 0.9rem; z-index: 99999;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25); display: none;
+      animation: slideIn 0.25s ease;
+    }
+    @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    /* ─── 우승자 배너 ─────────────────────────────────────────── */
+    .winner-banner {
+      background: linear-gradient(135deg, #f59e0b, #fbbf24);
+      color: #1c1917; border-radius: 10px; padding: 1rem 1.25rem;
+      text-align: center; font-weight: 700; margin-bottom: 1rem;
+    }
+    .winner-banner .trophy { font-size: 2rem; margin-bottom: 0.25rem; }
+
+    /* ─── 대기 중 알림 ────────────────────────────────────────── */
+    #match-alert {
+      position: fixed; top: 5rem; right: 1.5rem; z-index: 9999;
+      background: #1e3a5f; color: #fff; border-radius: 12px; padding: 1rem 1.25rem;
+      max-width: 300px; box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+      display: none; animation: slideIn 0.3s ease;
+    }
+    #match-alert h4 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+    #match-alert p { margin: 0 0 0.75rem; font-size: 0.82rem; opacity: 0.85; }
+    #match-alert .btn { font-size: 0.8rem; }
+
+    .empty-state { text-align: center; padding: 2.5rem 1rem; color: var(--text-muted, #64748b); font-size: 0.9rem; }
+    .empty-state i { font-size: 2.5rem; margin-bottom: 0.75rem; display: block; opacity: 0.35; }
+
+    .rounds-nav { display: flex; gap: 0.35rem; flex-wrap: wrap; padding: 0 1.25rem 0.5rem; }
+    .round-btn {
+      padding: 0.3rem 0.75rem; border-radius: 20px; border: 1px solid var(--border-color, #e2e8f0);
+      cursor: pointer; font-size: 0.78rem; font-weight: 600; background: transparent;
+      color: var(--text-muted, #64748b); transition: all 0.2s;
+    }
+    .round-btn.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+
+    .detail-tabs { display: flex; border-bottom: 1px solid var(--border-color, #e2e8f0); }
+    .detail-tab-btn {
+      flex: 1; padding: 0.75rem; border: none; background: transparent; cursor: pointer;
+      font-size: 0.88rem; font-weight: 600; color: var(--text-muted, #64748b);
+      border-bottom: 2px solid transparent; transition: all 0.2s;
+    }
+    .detail-tab-btn.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+    .detail-tab-content { display: none; }
+    .detail-tab-content.active { display: block; }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-to-content">메인 컨텐츠로 이동</a>
+
+  <header id="header" class="header" role="banner">
+    <div class="container">
+      <div class="logo">
+        <h1><a href="index.html" style="text-decoration: none; color: inherit;"><i class="fas fa-chess-king" aria-hidden="true"></i> NAK 체스</a></h1>
+      </div>
+      <nav class="nav" role="navigation" aria-label="메인 네비게이션">
+        <ul class="nav-list" id="nav-list">
+          <li><a href="index.html" class="nav-link">홈</a></li>
+          <li><a href="features.html" class="nav-link">기능</a></li>
+          <li><a href="how-to-play.html" class="nav-link">게임 방법</a></li>
+          <li><a href="chess-rules.html" class="nav-link">체스 규칙</a></li>
+          <li><a href="leaderboard.html" class="nav-link">리더보드</a></li>
+          <li><a href="stats.html" class="nav-link">통계</a></li>
+          <li><a href="friends.html" class="nav-link">친구</a></li>
+          <li><a href="tournament.html" class="nav-link active">토너먼트</a></li>
+        </ul>
+      </nav>
+      <div class="header-actions">
+        <button id="dark-mode-toggle" class="icon-btn" aria-label="다크모드 전환" title="다크모드 전환">
+          <i class="fas fa-moon"></i>
+        </button>
+        <div id="auth-links" class="auth-links">
+          <a href="login.html" class="btn btn-sm btn-outline">로그인</a>
+          <a href="game.html" class="btn btn-sm btn-primary">게임 시작</a>
+        </div>
+      </div>
+      <div class="mobile-nav-toggle" id="mobile-nav-toggle" aria-label="모바일 메뉴 토글">
+        <i class="fas fa-bars"></i>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <section class="page-hero">
+      <div class="container">
+        <div class="page-hero-content reveal">
+          <h1 class="page-hero-title"><i class="fas fa-trophy"></i> 토너먼트</h1>
+          <p class="page-hero-desc">다른 플레이어들과 경쟁하여 토너먼트 우승자가 되세요!</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="tournament-page">
+      <div class="container">
+        <div class="tournament-layout">
+
+          <!-- ─── 왼쪽: 토너먼트 목록 ─────────────────────────── -->
+          <aside>
+            <div class="t-panel">
+              <div class="t-panel-header">
+                <h3><i class="fas fa-list"></i> 토너먼트 목록</h3>
+                <button class="btn btn-sm btn-primary" id="btn-create" style="display:none">
+                  <i class="fas fa-plus"></i> 만들기
+                </button>
+              </div>
+
+              <div class="t-tabs">
+                <button class="t-tab active" data-status="waiting">대기중</button>
+                <button class="t-tab" data-status="ongoing">진행중</button>
+                <button class="t-tab" data-status="finished">완료</button>
+                <button class="t-tab" data-status="">전체</button>
+              </div>
+
+              <div class="t-panel-body">
+                <div class="tournament-list" id="tournament-list">
+                  <div class="empty-state"><i class="fas fa-trophy"></i>토너먼트가 없습니다.</div>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <!-- ─── 오른쪽: 상세 보기 ──────────────────────────── -->
+          <div id="detail-panel">
+            <div class="t-panel" id="no-selection" style="padding:3rem;text-align:center;color:var(--text-muted,#64748b)">
+              <i class="fas fa-chess" style="font-size:3rem;opacity:0.3;display:block;margin-bottom:1rem"></i>
+              <p>왼쪽에서 토너먼트를 선택하세요.</p>
+              <p style="font-size:0.85rem;margin-top:0.5rem">로그인 후 직접 토너먼트를 만들 수도 있습니다.</p>
+            </div>
+
+            <div class="t-panel" id="detail-view" style="display:none">
+              <!-- 헤더 -->
+              <div class="detail-header" id="detail-header"></div>
+
+              <!-- 탭 -->
+              <div class="detail-tabs">
+                <button class="detail-tab-btn active" data-tab="bracket">대진표</button>
+                <button class="detail-tab-btn" data-tab="standings">순위</button>
+                <button class="detail-tab-btn" data-tab="participants">참가자</button>
+              </div>
+
+              <!-- 대진표 탭 -->
+              <div class="detail-tab-content active" id="tab-bracket">
+                <div class="rounds-nav" id="rounds-nav"></div>
+                <div class="bracket-section" id="bracket-content"></div>
+              </div>
+
+              <!-- 순위 탭 -->
+              <div class="detail-tab-content" id="tab-standings">
+                <div style="padding:1.25rem" id="standings-content"></div>
+              </div>
+
+              <!-- 참가자 탭 -->
+              <div class="detail-tab-content" id="tab-participants">
+                <div style="padding:1.25rem" id="participants-content"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ─── 토너먼트 만들기 모달 ─────────────────────────────────── -->
+  <div class="modal-overlay" id="create-modal">
+    <div class="modal">
+      <h3><i class="fas fa-trophy" style="color:#f59e0b"></i> 토너먼트 만들기</h3>
+      <div class="form-row">
+        <label>토너먼트 이름</label>
+        <input type="text" id="t-name" placeholder="예: 주말 블리츠 대회" maxlength="40">
+      </div>
+      <div class="form-row">
+        <label>포맷</label>
+        <select id="t-format">
+          <option value="single_elimination">단판 토너먼트 (싱글 엘리미네이션)</option>
+          <option value="swiss">스위스 방식</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>최대 인원</label>
+        <select id="t-max">
+          <option value="4">4명</option>
+          <option value="8" selected>8명</option>
+          <option value="16">16명</option>
+          <option value="32">32명</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>시간 제한</label>
+        <select id="t-tc">
+          <option value="blitz">블리츠 (3분)</option>
+          <option value="rapid">래피드 (10분)</option>
+          <option value="classic">클래식 (30분)</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-cancel-create">취소</button>
+        <button class="btn btn-primary" id="btn-confirm-create">만들기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── 경기 알림 ─────────────────────────────────────────────── -->
+  <div id="match-alert">
+    <h4><i class="fas fa-chess-board"></i> 토너먼트 경기 시작!</h4>
+    <p id="match-alert-msg">상대방이 기다리고 있습니다.</p>
+    <button class="btn btn-primary" id="btn-go-match" style="width:100%">경기 참가하기</button>
+  </div>
+
+  <!-- ─── 토스트 ─────────────────────────────────────────────────── -->
+  <div id="t-toast"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="main.js"></script>
+  <script src="js/tournament.js"></script>
+</body>
+</html>
